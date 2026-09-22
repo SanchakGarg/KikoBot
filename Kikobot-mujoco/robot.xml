@@ -6,7 +6,9 @@
   <default>
     <default class="D:\Ashoka University\Academics\Thesis\Kiko-Bot Controller\Kikobot-mujoco">
       <joint frictionloss="0.1" armature="0.005"/>
-      <position kp="50" dampratio="1"/>
+      <!-- gear=180/pi makes ctrl read in DEGREES in the MuJoCo control panel.
+           kp is divided by gear^2 so joint stiffness stays the original 50. -->
+      <position kp="0.015230870989335428" dampratio="1" gear="57.29577951308232"/>
       <default class="visual">
         <geom type="mesh" contype="0" conaffinity="0" group="2"/>
       </default>
@@ -25,7 +27,7 @@
       <!-- Link j1___p1 -->
       <body name="j1___p1" pos="0 0 0.06" quat="0 -0.130526 -0.991445 0">
         <!-- Joint from base_plate to j1___p1 -->
-        <joint axis="0 0 1" name="J1" type="hinge" range="-4.440892098500626e-16 5.759586531581286"/>
+        <joint axis="0 0 1" name="J1" type="hinge" range="-2.8797932657906435 2.8797932657906435"/>
         <inertial pos="-0.00440219 0 -0.0380892" mass="0.100244" fullinertia="0.000109153 0.000115905 5.95685e-05 0 -1.68396e-05 0"/>
         <!-- Part j1___p1 -->
         <geom type="mesh" class="visual" pos="-0 0 0.06" quat="0 1 0 0" mesh="j1___p1" material="j1___p1_material"/>
@@ -36,7 +38,7 @@
         <!-- Link j2 -->
         <body name="j2" pos="-0.038 0 -0.075" quat="0.212631 0.67438 0.212631 0.67438">
           <!-- Joint from j1___p1 to j2 -->
-          <joint axis="0 0 1" name="J2" type="hinge" range="0.0 4.363323129985824"/>
+          <joint axis="0 0 1" name="J2" type="hinge" range="-2.181661564992912 2.181661564992912"/>
           <inertial pos="-0 0.074 -0.038924" mass="0.151046" fullinertia="0.000540032 7.24322e-05 0.000512933 0 -0 0"/>
           <!-- Part j2 -->
           <geom type="mesh" class="visual" pos="-0 0 -0" quat="0 1 0 0" mesh="j2" material="j2_material"/>
@@ -44,7 +46,7 @@
           <!-- Link j3 -->
           <body name="j3" pos="-0 0.148 0" quat="0 0.34202 0.939693 -0">
             <!-- Joint from j2 to j3 -->
-            <joint axis="0 0 1" name="J3" type="hinge" range="-1.6533441282717831e-12 4.886921905582469"/>
+            <joint axis="0 0 1" name="J3" type="hinge" range="-2.443460952792061 2.443460952792061"/>
             <inertial pos="0 -0.074 -0.0319154" mass="0.137438" fullinertia="0.000444192 5.26368e-05 0.000432804 -0 0 -0"/>
             <!-- Part j3 -->
             <geom type="mesh" class="visual" pos="0 0 0" quat="0 1 0 0" mesh="j3" material="j3_material"/>
@@ -52,7 +54,7 @@
             <!-- Link j4 -->
             <body name="j4" pos="0 -0.148 -0" quat="0 -0.34202 -0.939693 0">
               <!-- Joint from j3 to j4 -->
-              <joint axis="0 0 1" name="J4" type="hinge" range="-4.440892098500626e-16 4.886921905584122"/>
+              <joint axis="0 0 1" name="J4" type="hinge" range="-2.443460952792061 2.443460952792061"/>
               <inertial pos="-0 0.00638853 -0.0334823" mass="0.0508023" fullinertia="2.83462e-05 2.53894e-05 1.82038e-05 0 0 5.42261e-06"/>
               <!-- Part j4 -->
               <geom type="mesh" class="visual" pos="-0 0 0" quat="0 -1 0 -0" mesh="j4" material="j4_material"/>
@@ -60,7 +62,7 @@
               <!-- Link j5 -->
               <body name="j5" pos="-0 0.0335 -0.0485" quat="0.28231 0.28231 0.648306 -0.648306">
                 <!-- Joint from j4 to j5 -->
-                <joint axis="0 0 1" name="J5" type="hinge" range="-0.12325858628596587 4.763663319298157"/>
+                <joint axis="0 0 1" name="J5" type="hinge" range="-2.443460952792061 2.443460952792061"/>
                 <inertial pos="-9.8e-11 0.0036384 -0.0405494" mass="0.0725748" fullinertia="5.46367e-05 3.9936e-05 3.73627e-05 4e-12 0 2.75955e-06"/>
                 <!-- Part j5 -->
                 <geom type="mesh" class="visual" pos="0 0 -0" quat="0 -1 0 0" mesh="j5" material="j5_material"/>
@@ -68,7 +70,7 @@
                 <!-- Link eof -->
                 <body name="eof" pos="0 0.0415 -0.051" quat="0.0308436 0.0308436 0.706434 -0.706434">
                   <!-- Joint from j5 to eof -->
-                  <joint axis="0 0 1" name="J6" type="hinge" range="-7.505107646466058e-14 6.108652381980079"/>
+                  <joint axis="0 0 1" name="J6" type="hinge" range="-3.0543261909900767 3.0543261909900767"/>
                   <inertial pos="0 0 -0.0075" mass="0.0113398" fullinertia="2.32254e-06 2.32254e-06 4.21983e-06 0 -0 -0"/>
                   <!-- Part eof -->
                   <geom type="mesh" class="visual" pos="0 -0 -0" quat="0 -1 0 -0" mesh="eof" material="eof_material"/>
@@ -100,12 +102,12 @@
     <material name="eof_material" rgba="0.901961 0.901961 0.901961 1"/>
   </asset>
   <actuator>
-    <position class="D:\Ashoka University\Academics\Thesis\Kiko-Bot Controller\Kikobot-mujoco" name="J1" joint="J1" inheritrange="1"/>
-    <position class="D:\Ashoka University\Academics\Thesis\Kiko-Bot Controller\Kikobot-mujoco" name="J2" joint="J2" inheritrange="1"/>
-    <position class="D:\Ashoka University\Academics\Thesis\Kiko-Bot Controller\Kikobot-mujoco" name="J3" joint="J3" inheritrange="1"/>
-    <position class="D:\Ashoka University\Academics\Thesis\Kiko-Bot Controller\Kikobot-mujoco" name="J4" joint="J4" inheritrange="1"/>
-    <position class="D:\Ashoka University\Academics\Thesis\Kiko-Bot Controller\Kikobot-mujoco" name="J5" joint="J5" inheritrange="1"/>
-    <position class="D:\Ashoka University\Academics\Thesis\Kiko-Bot Controller\Kikobot-mujoco" name="J6" joint="J6" inheritrange="1"/>
+    <position class="D:\Ashoka University\Academics\Thesis\Kiko-Bot Controller\Kikobot-mujoco" name="J1" joint="J1" ctrlrange="-165 165"/>
+    <position class="D:\Ashoka University\Academics\Thesis\Kiko-Bot Controller\Kikobot-mujoco" name="J2" joint="J2" ctrlrange="-125 125"/>
+    <position class="D:\Ashoka University\Academics\Thesis\Kiko-Bot Controller\Kikobot-mujoco" name="J3" joint="J3" ctrlrange="-140 140"/>
+    <position class="D:\Ashoka University\Academics\Thesis\Kiko-Bot Controller\Kikobot-mujoco" name="J4" joint="J4" ctrlrange="-140 140"/>
+    <position class="D:\Ashoka University\Academics\Thesis\Kiko-Bot Controller\Kikobot-mujoco" name="J5" joint="J5" ctrlrange="-140 140"/>
+    <position class="D:\Ashoka University\Academics\Thesis\Kiko-Bot Controller\Kikobot-mujoco" name="J6" joint="J6" ctrlrange="-175 175"/>
   </actuator>
   <equality/>
 </mujoco>
