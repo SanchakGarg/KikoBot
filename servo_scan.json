@@ -1,0 +1,68 @@
+{
+    "timestamp": "2026-09-18T13:34:27.476447",
+    "port": "COM3",
+    "baudrate": 1000000,
+    "servo_count": 6,
+    "servos": [
+        {
+            "id": 1,
+            "model_number": 777,
+            "firmware_version": 0,
+            "position_raw": 2395,
+            "load_raw": 0,
+            "voltage": 12.4,
+            "temperature_c": 36,
+            "error_status": 0
+        },
+        {
+            "id": 2,
+            "model_number": 2825,
+            "firmware_version": 0,
+            "position_raw": 3089,
+            "load_raw": 0,
+            "voltage": 12.3,
+            "temperature_c": 34,
+            "error_status": 0
+        },
+        {
+            "id": 3,
+            "model_number": 777,
+            "firmware_version": 0,
+            "position_raw": 1242,
+            "load_raw": 0,
+            "voltage": 12.4,
+            "temperature_c": 35,
+            "error_status": 0
+        },
+        {
+            "id": 4,
+            "model_number": 777,
+            "firmware_version": 0,
+            "position_raw": 1190,
+            "load_raw": 0,
+            "voltage": 12.5,
+            "temperature_c": 34,
+            "error_status": 0
+        },
+        {
+            "id": 5,
+            "model_number": 777,
+            "firmware_version": 0,
+            "position_raw": 3143,
+            "load_raw": 0,
+            "voltage": 6.9,
+            "temperature_c": 32,
+            "error_status": 0
+        },
+        {
+            "id": 6,
+            "model_number": 777,
+            "firmware_version": 0,
+            "position_raw": 1373,
+            "load_raw": 0,
+            "voltage": 6.9,
+            "temperature_c": 32,
+            "error_status": 0
+        }
+    ]
+}
