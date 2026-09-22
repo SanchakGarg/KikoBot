@@ -9,16 +9,20 @@ SCENE_PATH = os.path.join(
 )
 
 EE_BODY = "eof"
+TOOL_AXIS_LOCAL = np.array([0.0, 0.0, 1.0])
 
-# Reachable workspace: a sphere of 370 mm diameter centered on the robot base.
+# Reachable workspace: a sphere of 370 mm radius centered on the robot base.
 BASE_ORIGIN = np.array([0.0, 0.0, 0.0])
-REACH_RADIUS = 0.185
+REACH_RADIUS = 0.370
 
 POS_TOL = 1e-4
-ROT_TOL = 1e-3
 MAX_ITERS = 200
 DAMPING = 0.05
 RESTARTS = 5
+
+WRIST_ITERS = 150
+WRIST_GAIN = 0.3
+WRIST_DAMPING_SQ = 0.02
 
 
 class IKSolver:
@@ -41,7 +45,10 @@ class IKSolver:
         mujoco.mj_forward(self.model, self.data)
         return self.data.xpos[self.ee_id].copy(), self.data.xquat[self.ee_id].copy()
 
-    def solve(self, target_pos, target_quat=None, q_init=None):
+    def solve(self, target_pos, point_dir=None, q_init=None):
+        """Solve for target_pos. If point_dir is given, also swing the wrist's
+        tool axis toward that world-frame direction using the arm's spare
+        (redundant) degrees of freedom, without disturbing target_pos."""
         target_pos = np.asarray(target_pos, dtype=float)
 
         if not self.in_workspace(target_pos):
@@ -56,38 +63,61 @@ class IKSolver:
                 seeds.append(rng.uniform(self.jnt_lo, self.jnt_hi))
 
         for seed in seeds:
-            q, ok = self._solve_from(target_pos, target_quat, seed)
+            q, ok = self._solve_position(target_pos, seed)
             if ok:
+                if point_dir is not None:
+                    q = self._align_wrist(q, target_pos, np.asarray(point_dir, dtype=float))
                 return q, True
 
         return None, False
 
-    def _solve_from(self, target_pos, target_quat, q):
+    def _solve_position(self, target_pos, q):
         for _ in range(MAX_ITERS):
-            ee_pos, ee_quat = self.forward(q)
-            pos_err = target_pos - ee_pos
+            ee_pos, _ = self.forward(q)
+            err = target_pos - ee_pos
 
-            if target_quat is not None:
-                rot_err = np.zeros(3)
-                mujoco.mju_subQuat(rot_err, target_quat, ee_quat)
-                err = np.concatenate([pos_err, rot_err])
-            else:
-                err = pos_err
-
-            if np.linalg.norm(pos_err) < POS_TOL and (
-                target_quat is None or np.linalg.norm(err[3:]) < ROT_TOL
-            ):
+            if np.linalg.norm(err) < POS_TOL:
                 if np.all(q >= self.jnt_lo) and np.all(q <= self.jnt_hi):
                     return q, True
                 return None, False
 
             mujoco.mj_jac(self.model, self.data, self._jacp, self._jacr, ee_pos, self.ee_id)
-            J = self._jacp if target_quat is None else np.vstack([self._jacp, self._jacr])
-
-            JJt = J @ J.T
-            lam_sq = DAMPING * DAMPING * np.eye(JJt.shape[0])
-            dq = J.T @ np.linalg.solve(JJt + lam_sq, err)
+            JJt = self._jacp @ self._jacp.T
+            lam_sq = DAMPING * DAMPING * np.eye(3)
+            dq = self._jacp.T @ np.linalg.solve(JJt + lam_sq, err)
 
             q = np.clip(q + dq, self.jnt_lo, self.jnt_hi)
 
         return None, False
+
+    def _align_wrist(self, q, target_pos, point_dir):
+        point_dir = point_dir / np.linalg.norm(point_dir)
+        best_q, best_ang = q.copy(), np.pi
+
+        for _ in range(WRIST_ITERS):
+            ee_pos, ee_quat = self.forward(q)
+            tool_axis = np.zeros(3)
+            mujoco.mju_rotVecQuat(tool_axis, TOOL_AXIS_LOCAL, ee_quat)
+            omega_des = np.cross(tool_axis, point_dir)
+            ang = np.arccos(np.clip(np.dot(tool_axis, point_dir), -1.0, 1.0))
+
+            if np.linalg.norm(target_pos - ee_pos) < 5e-4 and ang < best_ang:
+                best_q, best_ang = q.copy(), ang
+
+            mujoco.mj_jac(self.model, self.data, self._jacp, self._jacr, ee_pos, self.ee_id)
+
+            jp_pinv = self._jacp.T @ np.linalg.inv(self._jacp @ self._jacp.T + 1e-6 * np.eye(3))
+            nullspace = np.eye(self.nv) - jp_pinv @ self._jacp
+
+            jr_pinv = self._jacr.T @ np.linalg.inv(
+                self._jacr @ self._jacr.T + WRIST_DAMPING_SQ * np.eye(3)
+            )
+            dq_orient = nullspace @ (jr_pinv @ omega_des)
+            norm = np.linalg.norm(dq_orient)
+            if norm > 0.1:
+                dq_orient = dq_orient / norm * 0.1
+            dq_pos = jp_pinv @ (target_pos - ee_pos)
+
+            q = np.clip(q + WRIST_GAIN * dq_orient + dq_pos, self.jnt_lo, self.jnt_hi)
+
+        return best_q
