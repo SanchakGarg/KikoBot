@@ -6,9 +6,7 @@
   <default>
     <default class="D:\Ashoka University\Academics\Thesis\Kiko-Bot Controller\Kikobot-mujoco">
       <joint frictionloss="0.1" armature="0.005"/>
-      <!-- gear=180/pi makes ctrl read in DEGREES in the MuJoCo control panel.
-           kp is divided by gear^2 so joint stiffness stays the original 50. -->
-      <position kp="0.015230870989335428" dampratio="1" gear="57.29577951308232"/>
+      <position kp="50" dampratio="1"/>
       <default class="visual">
         <geom type="mesh" contype="0" conaffinity="0" group="2"/>
       </default>
@@ -102,12 +100,12 @@
     <material name="eof_material" rgba="0.901961 0.901961 0.901961 1"/>
   </asset>
   <actuator>
-    <position class="D:\Ashoka University\Academics\Thesis\Kiko-Bot Controller\Kikobot-mujoco" name="J1" joint="J1" ctrlrange="-165 165"/>
-    <position class="D:\Ashoka University\Academics\Thesis\Kiko-Bot Controller\Kikobot-mujoco" name="J2" joint="J2" ctrlrange="-125 125"/>
-    <position class="D:\Ashoka University\Academics\Thesis\Kiko-Bot Controller\Kikobot-mujoco" name="J3" joint="J3" ctrlrange="-140 140"/>
-    <position class="D:\Ashoka University\Academics\Thesis\Kiko-Bot Controller\Kikobot-mujoco" name="J4" joint="J4" ctrlrange="-140 140"/>
-    <position class="D:\Ashoka University\Academics\Thesis\Kiko-Bot Controller\Kikobot-mujoco" name="J5" joint="J5" ctrlrange="-140 140"/>
-    <position class="D:\Ashoka University\Academics\Thesis\Kiko-Bot Controller\Kikobot-mujoco" name="J6" joint="J6" ctrlrange="-175 175"/>
+    <position class="D:\Ashoka University\Academics\Thesis\Kiko-Bot Controller\Kikobot-mujoco" name="J1" joint="J1" inheritrange="1"/>
+    <position class="D:\Ashoka University\Academics\Thesis\Kiko-Bot Controller\Kikobot-mujoco" name="J2" joint="J2" inheritrange="1"/>
+    <position class="D:\Ashoka University\Academics\Thesis\Kiko-Bot Controller\Kikobot-mujoco" name="J3" joint="J3" inheritrange="1"/>
+    <position class="D:\Ashoka University\Academics\Thesis\Kiko-Bot Controller\Kikobot-mujoco" name="J4" joint="J4" inheritrange="1"/>
+    <position class="D:\Ashoka University\Academics\Thesis\Kiko-Bot Controller\Kikobot-mujoco" name="J5" joint="J5" inheritrange="1"/>
+    <position class="D:\Ashoka University\Academics\Thesis\Kiko-Bot Controller\Kikobot-mujoco" name="J6" joint="J6" inheritrange="1"/>
   </actuator>
   <!-- qpos0 equals each joint's ref: the pose the CAD was exported in,
        which sits at the lower hard stop (J5 is 7 deg inside it).

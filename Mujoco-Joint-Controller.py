@@ -60,13 +60,13 @@ for actuator_id in range(model.nu):
 
     print(
         f"{name} | "
-        f"{low:+7.1f}° .. {high:+7.1f}° | "
-        f"home {data.ctrl[actuator_id]:+.1f}°"
+        f"{low:+7.3f} .. {high:+7.3f} rad | "
+        f"home {data.ctrl[actuator_id]:+.3f} rad"
     )
 
 print("=" * 60)
 print("Open the Control panel in the viewer to drive the joints.")
-print("Sliders are in DEGREES.")
+print("Sliders are in RADIANS.")
 print("=" * 60)
 
 
