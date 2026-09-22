@@ -25,11 +25,18 @@ data = mujoco.MjData(model)
 
 # ============================================================
 # HOME POSE
+#
+# qpos0 is each joint's hard stop, so reset to the "home"
+# keyframe instead of mj_resetData.
 # ============================================================
 
-mujoco.mj_resetData(model, data)
+HOME_KEY = mujoco.mj_name2id(
+    model,
+    mujoco.mjtObj.mjOBJ_KEY,
+    "home"
+)
 
-data.ctrl[:] = 0.0
+mujoco.mj_resetDataKeyframe(model, data, HOME_KEY)
 
 
 # ============================================================
