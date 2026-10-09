@@ -4,10 +4,10 @@ import mujoco
 import mujoco.viewer
 import numpy as np
 
-from ik_solver import IKSolver, BASE_ORIGIN
+from Archive.InverseKinematics.ik_solver import IKSolver, BASE_ORIGIN
 
-POINT_A = (-0.15, 0.0, 0.05)
-POINT_B = (0.15, 0.0, 0.05)
+POINT_A = (-0.3, 0.1, 0.05)
+POINT_B = (0.1, 0.1, 0.05)
 LIFT = 0.03
 
 MOVE_DURATION = 1.5

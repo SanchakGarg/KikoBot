@@ -3,8 +3,8 @@ import time
 import numpy as np
 import scservo_sdk as scs
 
-from ik_solver import IKSolver, BASE_ORIGIN
-from pick_place import POINT_A, POINT_B, LIFT
+from Archive.InverseKinematics.ik_solver import IKSolver, BASE_ORIGIN
+from Archive.InverseKinematics.pick_place import POINT_A, POINT_B, LIFT
 
 COM_PORT = "COM3"
 BAUDRATE = 1000000
@@ -18,7 +18,7 @@ TORQUE_ON = 1
 TORQUE_OFF = 0
 
 # Raw speed units (servo-internal steps/sec). Lower = slower. 0 = unrestricted/max.
-GOAL_SPEED = 200
+GOAL_SPEED = 100
 
 RAW_MIN, RAW_MAX = 0, 4095
 ANGLE_MIN, ANGLE_MAX = -180.0, 180.0
