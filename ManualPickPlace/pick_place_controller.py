@@ -47,7 +47,7 @@ WORLD_Z = np.array([0.0, 0.0, 1.0])
 # The all-zero model keyframe is nearly straight-up and singular for Cartesian
 # motion. This bent pose has useful local motion and a horizontal J5 hinge
 # axis, so the J5 rotation plane starts perpendicular to world XY.
-READY_POSE_RAD = np.deg2rad([0.0, -45.0, 105.0, 60.0, 0.0, 0.0])
+READY_POSE_RAD = np.deg2rad([90.0, -45.0, 105.0, 60.0, -91.0, 0.0])
 
 # Windows virtual-key codes.  The dictionary also makes the polling code
 # independent of the GLFW window internals used by MuJoCo's passive viewer.

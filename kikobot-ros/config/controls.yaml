@@ -1,0 +1,20 @@
+pick_place_controller:
+  ros__parameters:
+    joy_left_x_axis: 0
+    joy_left_y_axis: 1
+    joy_left_trigger_axis: 2
+    joy_right_x_axis: 3
+    joy_right_y_axis: 4
+    joy_right_trigger_axis: 5
+    joy_a_button: 0
+    deadband: 0.12
+
+motor_controller:
+  ros__parameters:
+    servo_ids: [1, 2, 3, 4, 5, 6]
+    servo_zero_deg: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    servo_direction: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+    max_speed_deg_s: 30.0
+    slow_zone_deg: 20.0
+    min_speed_deg_s: 3.0
+    enable_torque: false
