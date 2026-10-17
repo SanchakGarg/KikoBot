@@ -165,4 +165,10 @@
   <equality>
     <joint joint1="finger_r" joint2="finger_l" polycoef="0 1.0 0 0 0"/>
   </equality>
+  <!-- qpos0 equals each joint's ref: the pose the CAD was exported in,
+       which sits at the lower hard stop (J5 is 7 deg inside it).
+       "home" is the mid-travel pose: every joint at 0 deg, gripper open. -->
+  <keyframe>
+    <key name="home" qpos="0 0 0 0 0 0 0 0" ctrl="0 0 0 0 0 0 0"/>
+  </keyframe>
 </mujoco>

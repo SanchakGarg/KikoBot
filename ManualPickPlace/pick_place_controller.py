@@ -49,6 +49,18 @@ WORLD_Z = np.array([0.0, 0.0, 1.0])
 # axis, so the J5 rotation plane starts perpendicular to world XY.
 READY_POSE_RAD = np.deg2rad([90.0, -45.0, 105.0, 60.0, -91.0, 0.0])
 
+# A 0.42 m XY radius and height range keep targets close to the physical
+# 540 mm home-pose envelope and above the fixed base/floor.
+WORKSPACE_XY_RADIUS_M = 0.42
+WORKSPACE_MIN_Z_M = 0.06
+WORKSPACE_MAX_Z_M = 0.55
+
+# The gripper adds roughly 0.10 m of reach below the J5 task point (the IK
+# target), so the J5-frame ready pose used to sit with the gripper tip
+# nearly touching the floor. Lift the starting Cartesian target well clear
+# of the table before any user input is given.
+READY_POSE_Z_LIFT_M = 0.15
+
 # Windows virtual-key codes.  The dictionary also makes the polling code
 # independent of the GLFW window internals used by MuJoCo's passive viewer.
 KEY_UP = 0x26
@@ -131,8 +143,14 @@ class PickPlaceController:
         self.data.qvel[:] = 0.0
         mujoco.mj_forward(self.model, self.data)
         targets = READY_POSE_RAD.copy()  # J5 and J6 are centred by default.
+        start_position = self.data.xpos[self.eef_body_id].copy()
+        start_position[2] = np.clip(
+            start_position[2] + READY_POSE_Z_LIFT_M,
+            WORKSPACE_MIN_Z_M,
+            WORKSPACE_MAX_Z_M,
+        )
         self.controls = Controls(
-            target_position=self.data.xpos[self.eef_body_id].copy(),
+            target_position=start_position,
             joint_targets=targets,
         )
         self.next_ik_time = self.data.time
@@ -153,12 +171,10 @@ class PickPlaceController:
         if not np.any(delta):
             return
         candidate = self.controls.target_position + delta
-        # A 0.42 m XY radius and 0.06--0.55 m height keep targets close to the
-        # physical 540 mm home-pose envelope and above the fixed base/floor.
-        candidate[2] = np.clip(candidate[2], 0.06, 0.55)
+        candidate[2] = np.clip(candidate[2], WORKSPACE_MIN_Z_M, WORKSPACE_MAX_Z_M)
         xy_norm = np.linalg.norm(candidate[:2])
-        if xy_norm > 0.42:
-            candidate[:2] *= 0.42 / xy_norm
+        if xy_norm > WORKSPACE_XY_RADIUS_M:
+            candidate[:2] *= WORKSPACE_XY_RADIUS_M / xy_norm
         self.controls.target_position = candidate
         self.cartesian_target_moved = True
 

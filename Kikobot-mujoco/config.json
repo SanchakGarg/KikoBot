@@ -1,4 +1,5 @@
 {
     "url": "https://cad.onshape.com/documents/b313e5b77bc0c3115d0b8fae/w/0842eaf9723f46fb0fc6e9c6/e/3fbf8cd2abf6666c702549ec",
-    "output_format": "mujoco"
+    "output_format": "mujoco",
+    "additional_xml": "keyframes.xml"
 }
