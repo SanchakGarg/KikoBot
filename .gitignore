@@ -1,3 +1,23 @@
-kikobot-ros/build/
-kikobot-ros/install/
-kikobot-ros/log/
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Editor / OS
+.vscode/
+.DS_Store
+
+# MuJoCo + capture artifacts
+MUJOCO_LOG.TXT
+*.mp4
+
+# LeRobot data and training output (large, regenerable)
+datasets/
+outputs/
+
+# Removed ROS package (kept so stale local copies stay ignored)
+kikobot-ros/build
+kikobot-ros/install
+kikobot-ros/log

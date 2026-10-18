@@ -5,7 +5,7 @@ import numpy as np
 
 SCENE_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
-    "..", "Kikobot-mujoco", "scene.xml"
+    "..", "..", "models", "scene.xml"
 )
 
 EE_BODY = "eof"

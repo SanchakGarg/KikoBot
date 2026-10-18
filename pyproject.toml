@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kikobot"
+version = "0.1.0"
+description = "Kiko-Bot: a 6-DOF arm, its MuJoCo model, and the controllers that drive it"
+requires-python = ">=3.12"
+dependencies = [
+    "mujoco>=3.16",
+    "numpy>=2",
+]
+
+[project.optional-dependencies]
+# Gamepad teleop and MP4 capture from the scene's `record` camera.
+teleop = ["glfw>=2.9"]
+video = ["imageio[ffmpeg]>=2.34"]
+# Driving the physical arm over the Feetech/SCServo bus.
+hardware = ["scservo-sdk"]
+# The Tk + matplotlib per-servo tuning GUI.
+gui = ["matplotlib>=3.8"]
+
+[tool.setuptools.packages.find]
+include = ["kikobot*"]

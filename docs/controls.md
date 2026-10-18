@@ -1,16 +1,16 @@
 # Kiko-Bot manual pick-and-place controller
 
-`pick_place_controller.py` is an interactive MuJoCo controller for the Kiko-Bot arm. It converts Cartesian commands into J1--J4 joint targets, using the `j5` body origin (the J5 wrist pivot) as its Cartesian end-effector point. J5 and J6 remain manual wrist joints. It is simulation-only: it does not send commands to the physical robot.
+`kikobot/sim/controller.py` is an interactive MuJoCo controller for the Kiko-Bot arm. It converts Cartesian commands into J1--J4 joint targets, using the `j5` body origin (the J5 wrist pivot) as its Cartesian end-effector point. J5 and J6 remain manual wrist joints. It is simulation-only: it does not send commands to the physical robot.
 
 ## Run it
 
 From the repository root:
 
 ```powershell
-python .\ManualPickPlace\pick_place_controller.py
+python -m kikobot.sim.controller
 ```
 
-The script loads `Kikobot-mujoco/scene.xml`, so it must remain inside this repository. It requires the same Python environment that runs the existing MuJoCo controller (`mujoco` and its `glfw` dependency).
+The module loads `models/scene.xml` via `kikobot.SCENE_PATH`, so it runs from any working directory. It requires the same Python environment that runs the existing MuJoCo controller (`mujoco` and its `glfw` dependency).
 
 ## Controls
 

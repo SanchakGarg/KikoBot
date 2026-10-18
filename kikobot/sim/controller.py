@@ -22,11 +22,9 @@ except ImportError:  # Keyboard control remains available without gamepad suppor
     glfw = None
 
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCENE_PATH = os.path.join(PROJECT_ROOT, "Kikobot-mujoco", "scene.xml")
+from kikobot import PROJECT_ROOT, SCENE_PATH
 
-# The Windows key-state API provides true press-and-hold control even though
-# MuJoCo's passive-viewer callback reports presses only.
+# The viewer callback reports presses only; Windows polls held state instead.
 KEYBOARD_TRANSLATION_STEP_M = 0.005
 KEYBOARD_WRIST_STEP_RAD = np.deg2rad(3.0)
 KEYBOARD_TRANSLATION_SPEED_MPS = 0.10
@@ -37,9 +35,8 @@ GAMEPAD_TRANSLATION_SPEED_MPS = 0.12
 GAMEPAD_WRIST_SPEED_RADPS = np.deg2rad(75.0)
 DEADZONE = 0.12
 
-# Jaw travel per second while an open/close key is held. The full stroke is
-# around 27 mm, so this closes the gripper in roughly a second and allows
-# stopping part-way to grip objects of different widths.
+# Jaw travel per second while held. Full stroke ~27 mm, so roughly a second
+# to close, and the jaws can be stopped part-way onto an object.
 GRIPPER_SPEED_MPS = 0.03
 GRIPPER_STEP_M = 0.0015
 
@@ -47,32 +44,26 @@ GRIPPER_STEP_M = 0.0015
 DAMPING = 0.035
 MAX_IK_STEP_RAD = np.deg2rad(2.0)
 IK_UPDATE_PERIOD_S = 0.02
-# Steps of IK run on the kinematic copy during a reset, before physics is
-# allowed to run. The CAD ready pose has the gripper below the table surface,
-# so the arm must be placed at the lifted start pose rather than driven there.
+# Run on the kinematic copy during a reset: the CAD pose puts the gripper
+# below the table, so the arm is placed at the lifted pose, not driven there.
 IK_WARM_START_ITERATIONS = 300
 PLANE_AXIS_Z_TOLERANCE = np.sin(np.deg2rad(1.0))
 
 WORLD_Z = np.array([0.0, 0.0, 1.0])
-# The all-zero model keyframe is nearly straight-up and singular for Cartesian
-# motion. This bent pose has useful local motion and a horizontal J5 hinge
-# axis, so the J5 rotation plane starts perpendicular to world XY.
+# The all-zero keyframe is near-singular for Cartesian motion. This bent pose
+# moves well locally and starts J5's hinge axis horizontal.
 READY_POSE_RAD = np.deg2rad([90.0, -45.0, 105.0, 60.0, -91.0, 0.0])
 
-# A 0.42 m XY radius and height range keep targets close to the physical
-# 540 mm home-pose envelope and above the fixed base/floor.
+# Keeps targets inside the physical 540 mm envelope and above the base/floor.
 WORKSPACE_XY_RADIUS_M = 0.42
 WORKSPACE_MIN_Z_M = 0.06
 WORKSPACE_MAX_Z_M = 0.55
 
-# The gripper adds roughly 0.10 m of reach below the J5 task point (the IK
-# target), so the J5-frame ready pose used to sit with the gripper tip
-# nearly touching the floor. Start the Cartesian target at a fixed height
-# well clear of the table before any user input is given.
+# The gripper hangs ~0.10 m below the J5 task point, so start the target
+# high enough that the tip clears the table.
 READY_POSE_START_Z_M = 0.20
 
-# Windows virtual-key codes.  The dictionary also makes the polling code
-# independent of the GLFW window internals used by MuJoCo's passive viewer.
+# Windows virtual-key codes, so polling does not depend on GLFW internals.
 KEY_UP = 0x26
 KEY_DOWN = 0x28
 KEY_LEFT = 0x25
@@ -94,9 +85,8 @@ class PickPlaceController:
     def __init__(self, model: mujoco.MjModel, data: mujoco.MjData) -> None:
         self.model = model
         self.data = data
-        # Keep an independent kinematic state for IK. The simulated arm can
-        # sag slightly under gravity between actuator updates; planning from
-        # that transient pose caused the plane gate to report false limits.
+        # Independent kinematic state: the arm sags slightly under gravity
+        # between updates, and planning from that made the plane gate misfire.
         self.ik_data = mujoco.MjData(model)
 
         self.joint_ids = np.array(
@@ -113,20 +103,16 @@ class PickPlaceController:
         self.ik_dof_ids = model.jnt_dofadr[self.ik_joint_ids]
         self.ik_qpos_ids = model.jnt_qposadr[self.ik_joint_ids]
         self.wrist_qpos_ids = model.jnt_qposadr[self.joint_ids[4:]]
-        # The Cartesian task point is the J5 frame, not the final `eof` mesh.
-        # J5 is the wrist pivot: treating it as the end effector makes J1--J4
-        # responsible only for positioning the arm, while J5/J6 stay manual.
+        # Task point is the J5 wrist pivot, not `eof`: J1--J4 then only
+        # position the arm, leaving J5/J6 manual.
         self.eef_body_id = mujoco.mj_name2id(
             model, mujoco.mjtObj.mjOBJ_BODY, "j5"
         )
         if self.eef_body_id < 0:
             raise RuntimeError("The model must contain the J5 body.")
 
-        # The two finger meshes straddle the grasp point. Their midpoint is
-        # where an object actually ends up, which is offset from the J5 task
-        # point by an amount that changes with the arm's configuration.
-        # Each mesh appears twice, as a visual and a collision geom; either
-        # gives the same world position, so keep the first of each.
+        # The finger midpoint is where an object actually ends up. Each mesh
+        # appears as both a visual and a collision geom; either will do.
         finger_geoms = {}
         for geom_id in range(model.ngeom):
             mesh_id = model.geom_dataid[geom_id]
@@ -142,9 +128,8 @@ class PickPlaceController:
 
         self.joint_low = model.jnt_range[self.joint_ids, 0].copy()
         self.joint_high = model.jnt_range[self.joint_ids, 1].copy()
-        # The gripper is one position servo on finger_l; finger_r mirrors it
-        # through the model's equality constraint. Open/closed come from the
-        # actuator's own ctrlrange so a re-exported CAD stays correct.
+        # One servo on finger_l; finger_r mirrors it via the model equality.
+        # Limits come from the actuator's ctrlrange so a re-export stays right.
         self.gripper_actuator_id = mujoco.mj_name2id(
             model, mujoco.mjtObj.mjOBJ_ACTUATOR, "finger_l"
         )
@@ -167,8 +152,7 @@ class PickPlaceController:
         except AttributeError:
             self.get_async_key_state = None
 
-        # The supplied model's normal reset pose is the CAD lower-stop pose.
-        # Start in a deliberately bent, nonsingular ready pose instead.
+        # The model's reset pose is the CAD lower stop; start bent instead.
         self.reset_to_ready_pose()
 
     def reset_to_ready_pose(self) -> None:
@@ -194,10 +178,8 @@ class PickPlaceController:
             joint_targets=targets,
             gripper_ctrl=self.gripper_open_ctrl,  # Start with the jaws open.
         )
-        # Converge the IK on the kinematic copy and place the arm at the
-        # result. Letting physics drive it up from the CAD pose instead would
-        # start the session with the gripper buried in the table, which jams
-        # the fingers against it.
+        # Converge on the kinematic copy, then place the arm there. Letting
+        # physics drive it up instead buries the gripper in the table.
         for _ in range(IK_WARM_START_ITERATIONS):
             self.solve_ik_step()
         self.data.qpos[self.model.jnt_qposadr[self.joint_ids]] = (
@@ -364,9 +346,8 @@ class PickPlaceController:
         )
         task_error = np.concatenate((position_error, [-j5_axis_world[2]]))
 
-        # Four controlled joints serve four task equations. Solve the equality
-        # system directly when it is well-conditioned so damping does not
-        # soften the J5-plane condition. Near singularities use DLS instead.
+        # Four joints, four task equations: solve exactly when well-conditioned
+        # so damping cannot soften the J5-plane condition, else fall back to DLS.
         if np.linalg.cond(task_jacobian) < 1e7:
             delta_q = np.linalg.solve(task_jacobian, task_error)
         else:
@@ -381,11 +362,9 @@ class PickPlaceController:
         if max_change > MAX_IK_STEP_RAD:
             delta_q *= MAX_IK_STEP_RAD / max_change
 
-        # Integrate from the same commanded pose used by the kinematic copy.
-        # Nonlinear kinematics leave a small residual after a differential
-        # update. Backtrack until the candidate satisfies the plane constraint.
-        # Keep the requested Cartesian target if no step is feasible so a
-        # reverse command can retreat from the boundary.
+        # A differential step leaves a residual, so backtrack until the
+        # candidate satisfies the plane constraint. If none does, keep the
+        # requested target so a reverse command can retreat from the boundary.
         accepted_targets = None
         accepted_scale = 0.0
         scale = 1.0
@@ -428,8 +407,8 @@ class PickPlaceController:
         if self.get_async_key_state is None:
             return
 
-        # Arrow keys drive the Cartesian target across the table, Q/E height.
-        # WASD is deliberately avoided: the MuJoCo viewer binds those itself.
+        # Arrows move across the table, Q/E for height. WASD is avoided
+        # because the MuJoCo viewer binds those itself.
         motion = np.array(
             [
                 float(self._key_is_down(KEY_UP)) - float(self._key_is_down(KEY_DOWN)),
@@ -438,7 +417,7 @@ class PickPlaceController:
                 float(self._key_is_down(ord("Q"))) - float(self._key_is_down(ord("E"))),
             ]
         )
-        # Diagonal movement has the same maximum speed as axial movement.
+        # Diagonals must not outpace the axes.
         motion_norm = np.linalg.norm(motion)
         if motion_norm > 1.0:
             motion /= motion_norm
@@ -633,9 +612,8 @@ def main() -> None:
             controller.apply_controls()
             mujoco.mj_step(model, data)
             if wrist_only_motion:
-                # Capture the post-step pose, after the manual wrist has moved.
-                # The next frame will therefore have no Cartesian error to
-                # compensate with J1--J4.
+                # Capture the post-step pose so the next frame has no
+                # Cartesian error for J1--J4 to compensate.
                 controller.hold_cartesian_target_at_current_pose()
             viewer.sync()
 

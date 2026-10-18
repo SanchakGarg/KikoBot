@@ -23,8 +23,7 @@ except ImportError:  # Keyboard control remains available without gamepad suppor
     glfw = None
 
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCENE_PATH = os.path.join(PROJECT_ROOT, "Kikobot-mujoco", "scene.xml")
+from kikobot import PROJECT_ROOT, SCENE_PATH
 
 # Physical servo bus settings copied from Joint-Controller.py.
 COM_PORT = "COM3"

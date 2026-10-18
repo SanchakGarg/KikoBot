@@ -1,18 +1,9 @@
 """Pick-and-place training scene driven by the existing Cartesian IK.
 
-Loads `Kikobot-mujoco/pick_place_scene.xml` (arm on a table, plus a recording
-camera), spawns the red cube and the green place pad at random reachable
-positions, and hands control to the same teleoperation used by
-`pick_place_controller.py`.
-
-Spawn positions are restricted to a cone around the direction the arm is
-currently pointing. That is not cosmetic: the Cartesian solver is a local
-differential IK with a J5-plane constraint, so it cannot swing the base
-across a large heading change. Measured against this model, targets converge
-exactly within roughly +/-45 deg of the current heading and at a table-level
-object radius of 0.23--0.37 m; outside that band the solve stalls at the
-plane boundary. Every spawn in that band has been checked to be both
-reachable and graspable.
+Spawns are restricted to a +/-45 deg cone at radius 0.23--0.37 m. That is not
+cosmetic: the solver is a local differential IK with a J5-plane constraint, so
+it cannot swing the base across a large heading change. Outside that measured
+band the solve stalls at the plane boundary.
 """
 
 from __future__ import annotations
@@ -24,7 +15,8 @@ import mujoco
 import mujoco.viewer
 import numpy as np
 
-import pick_place_controller as ppc
+from kikobot import PICK_PLACE_SCENE_PATH, PROJECT_ROOT
+from . import controller as ppc
 
 try:
     import imageio.v2 as imageio  # Optional: only needed to record video.
@@ -32,26 +24,19 @@ except ImportError:
     imageio = None
 
 
-SCENE_PATH = os.path.join(
-    ppc.PROJECT_ROOT, "Kikobot-mujoco", "pick_place_scene.xml"
-)
+SCENE_PATH = PICK_PLACE_SCENE_PATH
 
-# Reachable band for the OBJECT (not the IK target) at table height, measured
-# by driving this model's own IK onto objects across a radius and heading
-# sweep. The grasp centre sits outside and below the J5 frame the solver
-# aims, so the object band is shifted outwards from the J5 band.
+# Reachable band for the OBJECT, not the IK target: the grasp centre sits
+# outside and below the J5 frame, so this band is shifted outwards.
 SPAWN_RADIUS_MIN_M = 0.23
 SPAWN_RADIUS_MAX_M = 0.37
 SPAWN_CONE_HALF_ANGLE_DEG = 45.0
 
-# Starting guess for how far the grasp centre sits below the J5 IK target.
-# Only a seed: ik_target_for() refines it against the real finger positions.
+# Seed only: ik_target_for() refines it against the real finger positions.
 GRASP_HEIGHT_OFFSET_M = 0.1163
 
-# The fingertips reach ~48 mm below the grasp centre that ik_target_for()
-# aims. A top-down grasp therefore puts the grasp centre ABOVE the object;
-# aiming at the object itself drives the fingers through the tabletop and
-# stalls the shoulder against its torque limit.
+# Fingertips reach ~48 mm below the grasp centre, so a top-down grasp aims
+# ABOVE the object; aiming at it drives the fingers through the tabletop.
 FINGER_REACH_BELOW_GRASP_CENTRE_M = 0.048
 TABLE_CLEARANCE_M = 0.008
 
@@ -64,7 +49,7 @@ MIN_CUBE_PAD_SEPARATION_M = PAD_RADIUS_M + CUBE_HALF_EXTENT_M + 0.05
 
 RECORDING_FPS = 30
 RECORDING_SIZE = (1280, 720)
-RECORDING_PATH = os.path.join(ppc.PROJECT_ROOT, "pick_place_recording.mp4")
+RECORDING_PATH = os.path.join(PROJECT_ROOT, "pick_place_recording.mp4")
 
 
 class SceneObjects:
@@ -125,10 +110,8 @@ class TrainingController(ppc.PickPlaceController):
     def reset_to_ready_pose(self) -> None:
         """Reset the arm, then re-place the objects.
 
-        The model's `home` keyframe is shorter than the scene's qpos, so
-        MuJoCo pads it with each body's declared pose. Resetting to it
-        therefore teleports the cube back to its XML position, and the
-        episode's spawn has to be re-applied afterwards.
+        The short `home` keyframe is zero-padded, which teleports the cube back
+        to its XML pose, so the spawn has to be re-applied.
         """
         super().reset_to_ready_pose()
         self.respawn_objects()
@@ -143,13 +126,9 @@ class TrainingController(ppc.PickPlaceController):
     ) -> np.ndarray:
         """The J5 target that puts the grasp centre on `object_position`.
 
-        The gripper hangs off the J5 frame by an amount that changes with the
-        arm's configuration, so there is no fixed offset to apply. Instead,
-        solve on the kinematic copy, measure where the fingers actually land,
-        and shift the target by that error until it settles.
-
-        Returns a target for `controls.target_position`; the live commanded
-        pose is left untouched.
+        The gripper's offset from J5 changes with configuration, so there is no
+        fixed correction: solve, measure where the fingers land, shift, repeat.
+        Leaves the live commanded pose untouched.
         """
         object_position = np.asarray(object_position, dtype=float)
         saved_target = self.controls.target_position.copy()
@@ -173,8 +152,8 @@ class TrainingController(ppc.PickPlaceController):
     def grasp_target_for(self, object_position: np.ndarray) -> np.ndarray:
         """IK target for a top-down grasp of an object resting on the table.
 
-        Height is set by how far the fingers hang below the grasp centre, not
-        by the object, so the fingertips straddle it and clear the table.
+        Height comes from the finger hang, not the object, so the fingertips
+        straddle it and clear the table.
         """
         aim = np.asarray(object_position, dtype=float).copy()
         aim[2] = FINGER_REACH_BELOW_GRASP_CENTRE_M + TABLE_CLEARANCE_M

@@ -9,19 +9,11 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 
-# ============================================================
-# CONFIG
-# ============================================================
-
 COM_PORT = "COM3"
 BAUDRATE = 1000000
 
 SERVO_IDS = [1, 2, 3, 4, 5, 6]
 
-
-# ============================================================
-# SERVO CONTROL TABLE
-# ============================================================
 
 ADDR_TORQUE_ENABLE = 40
 ADDR_GOAL_POSITION = 42
@@ -32,10 +24,6 @@ ADDR_PRESENT_LOAD = 60
 TORQUE_ON = 1
 TORQUE_OFF = 0
 
-
-# ============================================================
-# POSITION / ANGLE
-# ============================================================
 
 RAW_MIN = 0
 RAW_MAX = 4095
@@ -48,20 +36,12 @@ ANGLE_MAX = 180.0
 DEADBAND_DEG = 1.0
 
 
-# ============================================================
-# LOOP TIMING
-# ============================================================
-
 FEEDBACK_INTERVAL = 0.05       # 20 Hz
 CORRECTION_INTERVAL = 0.20     # 200 ms
 GRAPH_INTERVAL = 0.10          # 100 ms
 
 GRAPH_SECONDS = 30
 
-
-# ============================================================
-# GLOBAL STATE
-# ============================================================
 
 targets = {
     servo_id: None
@@ -89,19 +69,11 @@ last_send_time = {
 }
 
 
-# ============================================================
-# TORQUE / HOLD STATE
-# ============================================================
-
 torque_enabled = False
 hold_enabled = False
 
 running = True
 
-
-# ============================================================
-# SERIAL CONNECTION
-# ============================================================
 
 port = scs.PortHandler(COM_PORT)
 packet = scs.PacketHandler(0)
@@ -129,10 +101,6 @@ print(f"Port     : {COM_PORT}")
 print(f"Baudrate : {BAUDRATE}")
 print("=" * 60)
 
-
-# ============================================================
-# ANGLE CONVERSION
-# ============================================================
 
 def raw_to_angle(raw):
 
@@ -167,10 +135,6 @@ def angle_to_raw(angle):
 
     return int(round(raw))
 
-
-# ============================================================
-# READ PRESENT POSITION
-# ============================================================
 
 def read_position(servo_id):
 
@@ -213,10 +177,6 @@ def read_position(servo_id):
         return None
 
 
-# ============================================================
-# READ LOAD
-# ============================================================
-
 def read_load(servo_id):
 
     try:
@@ -239,10 +199,6 @@ def read_load(servo_id):
 
         return None
 
-
-# ============================================================
-# INITIALIZE POSITIONS
-# ============================================================
 
 def initialize_positions():
 
@@ -272,15 +228,10 @@ def initialize_positions():
             raw_position
         )
 
-        # ----------------------------------------------------
-        # IMPORTANT
-        #
         # The current physical position becomes the initial
         # target.
-        #
         # This prevents the servo from moving toward 0°
         # when torque is enabled.
-        # ----------------------------------------------------
 
         targets[servo_id] = angle
         actual_angles[servo_id] = angle
@@ -294,10 +245,6 @@ def initialize_positions():
     print("=" * 60)
     print()
 
-
-# ============================================================
-# SEND POSITION
-# ============================================================
 
 def send_angle(servo_id, angle):
 
@@ -350,10 +297,6 @@ def send_angle(servo_id, angle):
         return False
 
 
-# ============================================================
-# SET TORQUE
-# ============================================================
-
 def set_torque(servo_id, enabled):
 
     try:
@@ -395,10 +338,6 @@ def set_torque(servo_id, enabled):
 
         return False
 
-
-# ============================================================
-# ENABLE ALL TORQUE
-# ============================================================
 
 def enable_all_torque():
 
@@ -447,9 +386,7 @@ def enable_all_torque():
     )
 
 
-    # --------------------------------------------------------
     # Restore current targets
-    # --------------------------------------------------------
 
     for servo_id in SERVO_IDS:
 
@@ -463,21 +400,13 @@ def enable_all_torque():
             )
 
 
-# ============================================================
-# DISABLE ALL TORQUE
-# ============================================================
-
 def disable_all_torque():
 
     global torque_enabled
     global hold_enabled
 
-    # --------------------------------------------------------
-    # IMPORTANT:
-    #
     # Stop the laptop-side closed loop BEFORE disabling
     # physical servo torque.
-    # --------------------------------------------------------
 
     hold_enabled = False
     torque_enabled = False
@@ -496,9 +425,7 @@ def disable_all_torque():
     )
 
 
-    # --------------------------------------------------------
     # Disable physical torque
-    # --------------------------------------------------------
 
     for servo_id in SERVO_IDS:
 
@@ -512,17 +439,11 @@ def disable_all_torque():
     )
 
 
-# ============================================================
-# HOLD TOGGLE
-# ============================================================
-
 def toggle_hold():
 
     global hold_enabled
 
-    # --------------------------------------------------------
     # Can't enable hold if torque is off
-    # --------------------------------------------------------
 
     if not torque_enabled:
 
@@ -576,10 +497,6 @@ def toggle_hold():
         )
 
 
-# ============================================================
-# SLIDER CALLBACK
-# ============================================================
-
 def slider_changed(servo_id, value):
 
     try:
@@ -591,11 +508,8 @@ def slider_changed(servo_id, value):
         return
 
 
-    # --------------------------------------------------------
     # Slider is TARGET.
-    #
     # Actual position never modifies this.
-    # --------------------------------------------------------
 
     targets[servo_id] = angle
 
@@ -607,9 +521,7 @@ def slider_changed(servo_id, value):
     )
 
 
-    # --------------------------------------------------------
     # Only command the servo if torque is ON.
-    # --------------------------------------------------------
 
     if torque_enabled:
 
@@ -626,15 +538,7 @@ def slider_changed(servo_id, value):
     )
 
 
-# ============================================================
-# GUI
-# ============================================================
-
-# ------------------------------------------------------------
-# IMPORTANT:
-#
 # INITIAL POSITION READ MUST HAPPEN BEFORE CREATING SLIDERS.
-# ------------------------------------------------------------
 
 initialize_positions()
 
@@ -655,10 +559,6 @@ root.minsize(
 )
 
 
-# ============================================================
-# MAIN LAYOUT
-# ============================================================
-
 main_frame = ttk.Frame(
     root
 )
@@ -670,10 +570,6 @@ main_frame.pack(
     pady=10
 )
 
-
-# ============================================================
-# LEFT SIDE
-# ============================================================
 
 control_frame = ttk.LabelFrame(
     main_frame,
@@ -688,10 +584,6 @@ control_frame.pack(
 )
 
 
-# ============================================================
-# RIGHT SIDE
-# ============================================================
-
 graph_frame = ttk.LabelFrame(
     main_frame,
     text="Live Torque / Load"
@@ -703,10 +595,6 @@ graph_frame.pack(
     expand=True
 )
 
-
-# ============================================================
-# BUTTON BAR
-# ============================================================
 
 top_control = ttk.Frame(
     control_frame
@@ -766,10 +654,6 @@ torque_status_label.pack(
 )
 
 
-# ============================================================
-# SERVO CONTROLS
-# ============================================================
-
 target_labels = {}
 actual_labels = {}
 error_labels = {}
@@ -792,10 +676,6 @@ for row, servo_id in enumerate(SERVO_IDS):
     )
 
 
-    # --------------------------------------------------------
-    # SERVO ID
-    # --------------------------------------------------------
-
     ttk.Label(
         frame,
         text=f"ID {servo_id}",
@@ -808,10 +688,6 @@ for row, servo_id in enumerate(SERVO_IDS):
         pady=5
     )
 
-
-    # --------------------------------------------------------
-    # SLIDER
-    # --------------------------------------------------------
 
     initial_angle = targets[servo_id]
 
@@ -836,10 +712,6 @@ for row, servo_id in enumerate(SERVO_IDS):
             )
     )
 
-    # --------------------------------------------------------
-    # THIS IS NOW THE ACTUAL CURRENT POSITION
-    # --------------------------------------------------------
-
     slider.set(
         initial_angle
     )
@@ -854,10 +726,6 @@ for row, servo_id in enumerate(SERVO_IDS):
 
     sliders[servo_id] = slider
 
-
-    # --------------------------------------------------------
-    # TARGET
-    # --------------------------------------------------------
 
     target_label = ttk.Label(
         frame,
@@ -874,10 +742,6 @@ for row, servo_id in enumerate(SERVO_IDS):
 
     target_labels[servo_id] = target_label
 
-
-    # --------------------------------------------------------
-    # ACTUAL
-    # --------------------------------------------------------
 
     if actual_angles[servo_id] is None:
 
@@ -907,10 +771,6 @@ for row, servo_id in enumerate(SERVO_IDS):
     actual_labels[servo_id] = actual_label
 
 
-    # --------------------------------------------------------
-    # ERROR
-    # --------------------------------------------------------
-
     if actual_angles[servo_id] is None:
 
         error_text = "Error: ---"
@@ -939,10 +799,6 @@ for row, servo_id in enumerate(SERVO_IDS):
     error_labels[servo_id] = error_label
 
 
-    # --------------------------------------------------------
-    # LOAD
-    # --------------------------------------------------------
-
     load_label = ttk.Label(
         frame,
         text="Load: ---",
@@ -958,10 +814,6 @@ for row, servo_id in enumerate(SERVO_IDS):
 
     load_labels[servo_id] = load_label
 
-
-    # --------------------------------------------------------
-    # STATUS
-    # --------------------------------------------------------
 
     status_label = ttk.Label(
         frame,
@@ -979,10 +831,6 @@ for row, servo_id in enumerate(SERVO_IDS):
 
     status_labels[servo_id] = status_label
 
-
-# ============================================================
-# INFORMATION
-# ============================================================
 
 info_frame = ttk.LabelFrame(
     control_frame,
@@ -1023,10 +871,6 @@ ttk.Label(
     pady=10
 )
 
-
-# ============================================================
-# MATPLOTLIB GRAPHS
-# ============================================================
 
 fig, axes = plt.subplots(
     len(SERVO_IDS),
@@ -1092,10 +936,6 @@ canvas.get_tk_widget().pack(
 )
 
 
-# ============================================================
-# GRAPH DATA
-# ============================================================
-
 max_points = int(
     GRAPH_SECONDS /
     GRAPH_INTERVAL
@@ -1121,10 +961,6 @@ graph_times = {
 graph_start_time = time.time()
 
 
-# ============================================================
-# FEEDBACK THREAD
-# ============================================================
-
 def feedback_loop():
 
     global running
@@ -1140,10 +976,6 @@ def feedback_loop():
                 break
 
 
-            # ------------------------------------------------
-            # READ ACTUAL POSITION
-            # ------------------------------------------------
-
             raw_position = read_position(
                 servo_id
             )
@@ -1157,10 +989,6 @@ def feedback_loop():
                 )
 
 
-            # ------------------------------------------------
-            # READ LOAD
-            # ------------------------------------------------
-
             raw_load = read_load(
                 servo_id
             )
@@ -1171,10 +999,6 @@ def feedback_loop():
                     servo_id
                 ] = raw_load
 
-
-            # ------------------------------------------------
-            # CLOSED LOOP
-            # ------------------------------------------------
 
             if (
                 torque_enabled
@@ -1203,9 +1027,7 @@ def feedback_loop():
                     now = time.time()
 
 
-                    # ----------------------------------------
                     # Only correct outside deadband
-                    # ----------------------------------------
 
                     if abs(error) > DEADBAND_DEG:
 
@@ -1227,9 +1049,7 @@ def feedback_loop():
                             ] = now
 
 
-        # ----------------------------------------------------
         # Maintain feedback frequency
-        # ----------------------------------------------------
 
         elapsed = (
             time.time()
@@ -1247,10 +1067,6 @@ def feedback_loop():
                 sleep_time
             )
 
-
-# ============================================================
-# GUI UPDATE
-# ============================================================
 
 def update_gui():
 
@@ -1273,10 +1089,6 @@ def update_gui():
         ]
 
 
-        # ----------------------------------------------------
-        # ACTUAL
-        # ----------------------------------------------------
-
         if actual is None:
 
             actual_labels[
@@ -1293,10 +1105,6 @@ def update_gui():
                 text=f"Actual: {actual:+.1f}°"
             )
 
-
-        # ----------------------------------------------------
-        # ERROR
-        # ----------------------------------------------------
 
         if (
             actual is None
@@ -1323,20 +1131,12 @@ def update_gui():
             )
 
 
-        # ----------------------------------------------------
-        # LOAD
-        # ----------------------------------------------------
-
         load_labels[
             servo_id
         ].config(
             text=f"Load: {load}"
         )
 
-
-        # ----------------------------------------------------
-        # STATUS
-        # ----------------------------------------------------
 
         if not torque_enabled:
 
@@ -1387,10 +1187,6 @@ def update_gui():
     )
 
 
-# ============================================================
-# GRAPH UPDATE
-# ============================================================
-
 def update_graph():
 
     if not running:
@@ -1436,9 +1232,7 @@ def update_graph():
         )
 
 
-    # --------------------------------------------------------
     # Moving time window
-    # --------------------------------------------------------
 
     if current_time <= GRAPH_SECONDS:
 
@@ -1466,10 +1260,6 @@ def update_graph():
     )
 
 
-# ============================================================
-# CLOSE
-# ============================================================
-
 def on_close():
 
     global running
@@ -1479,12 +1269,9 @@ def on_close():
 
     running = False
 
-    # --------------------------------------------------------
     # Do NOT disable torque automatically.
-    #
     # This prevents the arm from suddenly falling when
     # the GUI is closed.
-    # --------------------------------------------------------
 
     time.sleep(
         0.15
@@ -1512,10 +1299,6 @@ root.protocol(
 )
 
 
-# ============================================================
-# START FEEDBACK THREAD
-# ============================================================
-
 feedback_thread = threading.Thread(
     target=feedback_loop,
     daemon=True
@@ -1523,10 +1306,6 @@ feedback_thread = threading.Thread(
 
 feedback_thread.start()
 
-
-# ============================================================
-# START GUI UPDATE LOOPS
-# ============================================================
 
 root.after(
     100,
@@ -1540,10 +1319,6 @@ root.after(
     update_graph
 )
 
-
-# ============================================================
-# START GUI
-# ============================================================
 
 print(
     "GUI started."
@@ -1565,10 +1340,6 @@ print()
 
 root.mainloop()
 
-
-# ============================================================
-# CLEANUP
-# ============================================================
 
 running = False
 
