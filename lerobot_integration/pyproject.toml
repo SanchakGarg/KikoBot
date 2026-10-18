@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+# The distribution name is imported VERBATIM as a module name by LeRobot's
+# register_third_party_plugins(), so it must match the package directory
+# exactly. A hyphen here would silently break discovery.
+name = "lerobot_robot_kikobot"
+version = "0.1.0"
+description = "Kiko-Bot MuJoCo simulation as a LeRobot Robot + Teleoperator"
+requires-python = ">=3.12"
+dependencies = ["lerobot", "kikobot", "mujoco>=3.16", "numpy>=2"]
+
+[project.optional-dependencies]
+keyboard = ["pynput>=1.7.8"]
+gamepad = ["glfw>=2.9"]
+
+[tool.setuptools.packages.find]
+include = ["lerobot_robot_kikobot*"]
