@@ -212,12 +212,11 @@ class _GamepadBackend(_Backend):
 
         lx = self._dead(s.axes[glfw.GAMEPAD_AXIS_LEFT_X])
         ly = self._dead(s.axes[glfw.GAMEPAD_AXIS_LEFT_Y])
-        rx = self._dead(s.axes[glfw.GAMEPAD_AXIS_RIGHT_X])
         ry = self._dead(s.axes[glfw.GAMEPAD_AXIS_RIGHT_Y])
         # GLFW triggers rest at -1, full press +1.
         lt = (s.axes[glfw.GAMEPAD_AXIS_LEFT_TRIGGER] + 1.0) * 0.5
         rt = (s.axes[glfw.GAMEPAD_AXIS_RIGHT_TRIGGER] + 1.0) * 0.5
-        jaw = float(s.buttons[glfw.GAMEPAD_BUTTON_LEFT_BUMPER] == glfw.PRESS) - float(
+        wrist = float(s.buttons[glfw.GAMEPAD_BUTTON_LEFT_BUMPER] == glfw.PRESS) - float(
             s.buttons[glfw.GAMEPAD_BUTTON_RIGHT_BUMPER] == glfw.PRESS
         )
 
@@ -225,9 +224,9 @@ class _GamepadBackend(_Backend):
             "ee_x.vel": float(-ly * KEYBOARD_TRANSLATION_SPEED_MPS * dt),
             "ee_y.vel": float(lx * KEYBOARD_TRANSLATION_SPEED_MPS * dt),
             "ee_z.vel": float(-ry * KEYBOARD_TRANSLATION_SPEED_MPS * dt),
-            "j5.vel": float(rx * KEYBOARD_WRIST_SPEED_RADPS * dt),
-            "j6.vel": float((rt - lt) * KEYBOARD_WRIST_SPEED_RADPS * dt),
-            "gripper.vel": float(jaw * GRIPPER_SPEED_MPS * dt),
+            "j5.vel": 0.0,  # Right stick left/right is unmapped; no J5 control.
+            "j6.vel": float(wrist * KEYBOARD_WRIST_SPEED_RADPS * dt),
+            "gripper.vel": float((rt - lt) * GRIPPER_SPEED_MPS * dt),
         }
 
 
