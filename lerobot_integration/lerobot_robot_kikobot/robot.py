@@ -32,8 +32,11 @@ SUBSTEPS = 17
 class KikobotConfig(RobotConfig):
     scene: str = kikobot.PICK_PLACE_SCENE_PATH
     fps: int = 30
-    width: int = 320
-    height: int = 240
+    # The scene's offscreen framebuffer caps out at 1280x720
+    # (models/pick_place_scene.xml's <visual><global offwidth/offheight>);
+    # raising these further needs that cap raised too.
+    width: int = 640
+    height: int = 480
     # Not `cameras`: RobotConfig reserves that name for CameraConfig objects.
     camera_names: tuple[str, ...] = ("record",)
     seed: int | None = None

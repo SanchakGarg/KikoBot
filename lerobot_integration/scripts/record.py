@@ -44,6 +44,8 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--no-sound", action="store_true", help="skip spoken prompts")
     p.add_argument("--seed", type=int, default=None)
+    p.add_argument("--width", type=int, default=640, help="record camera width (max 1280)")
+    p.add_argument("--height", type=int, default=480, help="record camera height (max 720)")
     return p.parse_args()
 
 
@@ -51,7 +53,16 @@ def main() -> None:
     args = parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-    robot = Kikobot(KikobotConfig(id="kikobot_sim", fps=args.fps, seed=args.seed, viewer=args.viewer))
+    robot = Kikobot(
+        KikobotConfig(
+            id="kikobot_sim",
+            fps=args.fps,
+            seed=args.seed,
+            viewer=args.viewer,
+            width=args.width,
+            height=args.height,
+        )
+    )
     teleop = KikobotTeleop(KikobotTeleopConfig(id="kikobot_teleop", backend=args.backend, fps=args.fps))
 
     teleop_action_processor, robot_action_processor, robot_observation_processor = make_default_processors()
