@@ -56,7 +56,10 @@ needs to live in **one** Python environment.
 
 ### Setup
 
-LeRobot is not on PyPI in the version this targets (0.6.2), so clone it:
+LeRobot is not on PyPI in the version this targets (0.6.2), so clone it. Both
+platforms need Python 3.12 or newer.
+
+**macOS / Linux**
 
 ```bash
 git clone https://github.com/huggingface/lerobot.git ~/lerobot
@@ -64,22 +67,41 @@ cd ~/lerobot
 python3.12 -m venv .venv
 .venv/bin/pip install -e ".[core_scripts,training]"
 .venv/bin/pip install mujoco glfw
+
+cd /path/to/KikoBot
+~/lerobot/.venv/bin/pip install -e . -e lerobot_integration
+```
+
+**Windows (PowerShell)**
+
+```powershell
+git clone https://github.com/huggingface/lerobot.git $HOME\lerobot
+cd $HOME\lerobot
+py -3.12 -m venv .venv
+.venv\Scripts\pip install -e ".[core_scripts,training]"
+.venv\Scripts\pip install mujoco glfw
+
+cd C:\path\to\KikoBot
+$HOME\lerobot\.venv\Scripts\pip install -e . -e lerobot_integration
+```
+
+For CUDA training on Windows, install the matching torch build *before* the
+line above, otherwise pip resolves the CPU wheel:
+
+```powershell
+.venv\Scripts\pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
 ```
 
 `core_scripts` pulls in dataset writing, pynput and the rerun viewer;
 `training` adds accelerate, which `lerobot-train` requires.
 
-Then add this repo and the plugin to that same venv:
+### Check the setup
+
+One interpreter must have everything, and LeRobot must have found the plugin:
 
 ```bash
-cd /path/to/KikoBot
-~/lerobot/.venv/bin/pip install -e . -e lerobot_integration
-```
-
-Check that one interpreter has everything and that LeRobot found the plugin:
-
-```bash
-~/lerobot/.venv/bin/python -c "
+# macOS/Linux: ~/lerobot/.venv/bin/python     Windows: $HOME\lerobot\.venv\Scripts\python
+python -c "
 import lerobot.scripts.lerobot_record as rec
 from lerobot.robots import RobotConfig
 rec.register_third_party_plugins()
@@ -89,11 +111,24 @@ print('kikobot_sim' in RobotConfig.get_known_choices())"   # must print True
 That check is not optional: LeRobot swallows plugin import errors, so a broken
 plugin disappears silently instead of failing.
 
-On macOS, keyboard teleop needs Accessibility permission for your terminal
-(System Settings → Privacy & Security → Accessibility). Without it `pynput`
-starts but captures nothing, and the arm never moves.
+### Platform notes
+
+| | macOS | Windows |
+|---|---|---|
+| Interactive MuJoCo viewer | needs `mjpython` | plain `python` |
+| Offscreen rendering (what recording uses) | plain `python` | plain `python` |
+| Keyboard teleop | needs Accessibility permission | works as-is |
+| Spoken episode prompts | `say` | spawns PowerShell per episode — use `--no-sound` |
+
+On macOS, grant your terminal Accessibility permission (System Settings →
+Privacy & Security → Accessibility) or `pynput` starts but captures nothing
+and the arm never moves. Windows needs no equivalent.
 
 ### Run
+
+Substitute `V` for your venv: `~/lerobot/.venv/bin` on macOS/Linux,
+`$HOME\lerobot\.venv\Scripts` on Windows (and drop the `$` prefix when
+calling it from PowerShell).
 
 ```bash
 V=~/lerobot/.venv/bin
@@ -104,7 +139,7 @@ $V/lerobot-teleoperate --robot.type=kikobot_sim --teleop.type=kikobot_teleop --d
 # 2. Record demonstrations. --backend gamepad also works.
 $V/python lerobot_integration/scripts/record.py --episodes 50 --episode-time 40
 
-# 3. Train ACT. Use --policy.device=cuda on an NVIDIA box; mps works but is slower.
+# 3. Train ACT. cuda on the Windows box; mps on the Mac works but is slower.
 $V/lerobot-train --dataset.repo_id=local/kikobot_pickplace \
   --dataset.root=datasets/kikobot_pickplace \
   --policy.type=act --policy.device=cuda --steps=60000 --batch_size=16 \
@@ -120,8 +155,11 @@ stops. `--display_data=true` opens rerun, which is how you watch the arm
 without `mjpython`. Inspect a finished dataset with
 `$V/lerobot-dataset-viz --repo-id=local/kikobot_pickplace --root=datasets/kikobot_pickplace`.
 
-The dataset directory is self-contained, so recording on one machine and
-training on another is just a copy.
+The dataset directory is self-contained, so the intended split works by plain
+copy: record on whichever machine you teleoperate from, copy
+`datasets/kikobot_pickplace/` to the Windows box, train there with
+`--policy.device=cuda`, then copy `checkpoints/last/pretrained_model` back and
+evaluate in sim.
 
 ### Prove the loop first
 

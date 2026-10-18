@@ -118,8 +118,8 @@ class _KeyboardBackend(_Backend):
 
         if not pynput_can_capture():
             raise RuntimeError(
-                "pynput cannot capture keys here. Install it (pip install pynput); on "
-                "Linux a real X11 session is required."
+                "pynput cannot capture keys here. Install it (pip install pynput). "
+                "Linux needs a real X11 session; Windows and macOS need no display server."
             )
         from pynput import keyboard
 

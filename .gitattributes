@@ -1,0 +1,9 @@
+# Normalize line endings in the repo so editing on both Windows and macOS
+# does not produce whole-file diffs.
+* text=auto eol=lf
+
+# Binary assets: never touch these.
+*.stl binary
+*.mp4 binary
+*.png binary
+*.jpg binary

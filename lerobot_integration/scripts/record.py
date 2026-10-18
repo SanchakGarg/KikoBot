@@ -37,6 +37,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--repo-id", default="local/kikobot_pickplace")
     p.add_argument("--root", default="datasets/kikobot_pickplace")
     p.add_argument("--no-display", action="store_true", help="skip the rerun viewer")
+    p.add_argument("--no-sound", action="store_true", help="skip spoken prompts")
     p.add_argument("--seed", type=int, default=None)
     return p.parse_args()
 
@@ -85,11 +86,11 @@ def main() -> None:
         recorded = 0
         while recorded < args.episodes and not events["stop_recording"]:
             robot.reset_scene()
-            log_say(f"Recording episode {recorded + 1} of {args.episodes}")
+            log_say(f"Recording episode {recorded + 1} of {args.episodes}", not args.no_sound)
             record_loop(dataset=dataset, control_time_s=args.episode_time, **loop_kwargs)
 
             if events["rerecord_episode"]:
-                log_say("Re-recording episode")
+                log_say("Re-recording episode", not args.no_sound)
                 events["rerecord_episode"] = False
                 events["exit_early"] = False
                 dataset.clear_episode_buffer()
@@ -103,7 +104,7 @@ def main() -> None:
             if recorded < args.episodes and not events["stop_recording"]:
                 record_loop(control_time_s=args.reset_time, **loop_kwargs)
     finally:
-        log_say("Stop recording")
+        log_say("Stop recording", not args.no_sound)
         robot.disconnect()
         teleop.disconnect()
         if listener is not None:

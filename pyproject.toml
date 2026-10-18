@@ -16,8 +16,9 @@ dependencies = [
 # Gamepad teleop and MP4 capture from the scene's `record` camera.
 teleop = ["glfw>=2.9"]
 video = ["imageio[ffmpeg]>=2.34"]
-# Driving the physical arm over the Feetech/SCServo bus.
-hardware = ["scservo-sdk"]
+# Driving the physical arm. feetech-servo-sdk provides the `scservo_sdk`
+# module; it pulls in pyserial itself.
+hardware = ["feetech-servo-sdk>=1.0"]
 # The Tk + matplotlib per-servo tuning GUI.
 gui = ["matplotlib>=3.8"]
 
