@@ -37,6 +37,12 @@ GAMEPAD_TRANSLATION_SPEED_MPS = 0.12
 GAMEPAD_WRIST_SPEED_RADPS = np.deg2rad(75.0)
 DEADZONE = 0.12
 
+# Jaw travel per second while an open/close key is held. The full stroke is
+# around 27 mm, so this closes the gripper in roughly a second and allows
+# stopping part-way to grip objects of different widths.
+GRIPPER_SPEED_MPS = 0.03
+GRIPPER_STEP_M = 0.0015
+
 # Differential IK tuning.
 DAMPING = 0.035
 MAX_IK_STEP_RAD = np.deg2rad(2.0)
@@ -71,7 +77,6 @@ KEY_UP = 0x26
 KEY_DOWN = 0x28
 KEY_LEFT = 0x25
 KEY_RIGHT = 0x27
-KEY_SPACE = 0x20
 
 
 @dataclass
@@ -152,9 +157,8 @@ class PickPlaceController:
 
         self.last_gamepad_present = False
         self.last_a_pressed = False
-        self.last_b_pressed = False
         self.next_ik_time = 0.0
-        self.last_key_down = {"c": False, "h": False, "space": False}
+        self.last_key_down = {"c": False, "h": False}
         self.manual_wrist_moved = False
         self.cartesian_target_moved = False
         self.plane_constraint_blocked = False
@@ -227,6 +231,25 @@ class PickPlaceController:
     def gripper_is_open(self) -> bool:
         midpoint = 0.5 * (self.gripper_open_ctrl + self.gripper_closed_ctrl)
         return self.controls.gripper_ctrl > midpoint
+
+    def move_gripper(self, amount: float) -> None:
+        """Open (positive) or close (negative) the jaws by `amount` metres.
+
+        Gradual rather than a toggle, so the jaws can be stopped as soon as
+        they meet the object instead of always driving to a hard stop.
+        """
+        if self.gripper_actuator_id < 0 or abs(amount) < 1e-12:
+            return
+        span = self.gripper_open_ctrl - self.gripper_closed_ctrl
+        low = min(self.gripper_open_ctrl, self.gripper_closed_ctrl)
+        high = max(self.gripper_open_ctrl, self.gripper_closed_ctrl)
+        self.controls.gripper_ctrl = float(
+            np.clip(self.controls.gripper_ctrl + amount * np.sign(span), low, high)
+        )
+
+    def gripper_opening_m(self) -> float:
+        """Commanded jaw travel from fully closed, in metres."""
+        return abs(self.controls.gripper_ctrl - self.gripper_closed_ctrl)
 
     def toggle_gripper(self) -> None:
         """Flip the jaws between fully open and fully closed."""
@@ -405,12 +428,13 @@ class PickPlaceController:
         if self.get_async_key_state is None:
             return
 
-        # Left hand drives the Cartesian target: WASD on the table plane,
-        # Q/E for height.
+        # Arrow keys drive the Cartesian target across the table, Q/E height.
+        # WASD is deliberately avoided: the MuJoCo viewer binds those itself.
         motion = np.array(
             [
-                float(self._key_is_down(ord("W"))) - float(self._key_is_down(ord("S"))),
-                float(self._key_is_down(ord("A"))) - float(self._key_is_down(ord("D"))),
+                float(self._key_is_down(KEY_UP)) - float(self._key_is_down(KEY_DOWN)),
+                float(self._key_is_down(KEY_LEFT))
+                - float(self._key_is_down(KEY_RIGHT)),
                 float(self._key_is_down(ord("Q"))) - float(self._key_is_down(ord("E"))),
             ]
         )
@@ -420,27 +444,26 @@ class PickPlaceController:
             motion /= motion_norm
         self.translate_target(motion * KEYBOARD_TRANSLATION_SPEED_MPS * dt)
 
-        # Right hand drives the manual wrist: arrows only.
-        j5_direction = float(self._key_is_down(KEY_UP)) - float(
-            self._key_is_down(KEY_DOWN)
+        j5_direction = float(self._key_is_down(ord("R"))) - float(
+            self._key_is_down(ord("F"))
         )
-        j6_direction = float(self._key_is_down(KEY_RIGHT)) - float(
-            self._key_is_down(KEY_LEFT)
+        j6_direction = float(self._key_is_down(ord("Z"))) - float(
+            self._key_is_down(ord("X"))
         )
         self.move_wrist(4, j5_direction * KEYBOARD_WRIST_SPEED_RADPS * dt)
         self.move_wrist(5, j6_direction * KEYBOARD_WRIST_SPEED_RADPS * dt)
 
-        # Space, C and H are one-shot actions rather than repeated actions.
-        for key, virtual_key in (
-            ("space", KEY_SPACE),
-            ("c", ord("C")),
-            ("h", ord("H")),
-        ):
+        # Held keys, so the jaws can be stopped part-way onto an object.
+        jaw_direction = float(self._key_is_down(ord("O"))) - float(
+            self._key_is_down(ord("P"))
+        )
+        self.move_gripper(jaw_direction * GRIPPER_SPEED_MPS * dt)
+
+        # C and H are one-shot actions rather than repeated actions.
+        for key, virtual_key in (("c", ord("C")), ("h", ord("H"))):
             down = self._key_is_down(virtual_key)
             if down and not self.last_key_down[key]:
-                if key == "space":
-                    self.toggle_gripper()
-                elif key == "c":
+                if key == "c":
                     self.controls.joint_targets[4:] = 0.0
                 else:
                     self.reset_to_ready_pose()
@@ -450,29 +473,33 @@ class PickPlaceController:
         """Fallback for non-Windows systems, which use key-repeat events."""
         step = KEYBOARD_TRANSLATION_STEP_M
         wrist_step = KEYBOARD_WRIST_STEP_RAD
-        wrist_map = {
-            265: (4, wrist_step),    # GLFW_KEY_UP    -> J5 +
-            264: (4, -wrist_step),   # GLFW_KEY_DOWN  -> J5 -
-            262: (5, wrist_step),    # GLFW_KEY_RIGHT -> J6 +
-            263: (5, -wrist_step),   # GLFW_KEY_LEFT  -> J6 -
+        arrow_map = {
+            265: np.array([step, 0.0, 0.0]),   # GLFW_KEY_UP
+            264: np.array([-step, 0.0, 0.0]),  # GLFW_KEY_DOWN
+            263: np.array([0.0, step, 0.0]),   # GLFW_KEY_LEFT
+            262: np.array([0.0, -step, 0.0]),  # GLFW_KEY_RIGHT
         }
-        if keycode in wrist_map:
-            self.move_wrist(*wrist_map[keycode])
+        if keycode in arrow_map:
+            self.translate_target(arrow_map[keycode])
             return
 
         key = chr(keycode).lower() if 32 <= keycode <= 126 else ""
-        translation_map = {
-            "w": np.array([step, 0.0, 0.0]),
-            "s": np.array([-step, 0.0, 0.0]),
-            "a": np.array([0.0, step, 0.0]),
-            "d": np.array([0.0, -step, 0.0]),
-            "q": np.array([0.0, 0.0, step]),
-            "e": np.array([0.0, 0.0, -step]),
-        }
-        if key in translation_map:
-            self.translate_target(translation_map[key])
-        elif key == " ":
-            self.toggle_gripper()
+        if key == "q":
+            self.translate_target(np.array([0.0, 0.0, step]))
+        elif key == "e":
+            self.translate_target(np.array([0.0, 0.0, -step]))
+        elif key == "r":
+            self.move_wrist(4, wrist_step)   # Manual J5 positive rotation.
+        elif key == "f":
+            self.move_wrist(4, -wrist_step)  # Manual J5 negative rotation.
+        elif key == "z":
+            self.move_wrist(5, wrist_step)   # Manual J6 positive rotation.
+        elif key == "x":
+            self.move_wrist(5, -wrist_step)  # Manual J6 negative rotation.
+        elif key == "o":
+            self.move_gripper(GRIPPER_STEP_M)
+        elif key == "p":
+            self.move_gripper(-GRIPPER_STEP_M)
         elif key == "c":
             self.controls.joint_targets[4:] = 0.0
         elif key == "h":
@@ -524,10 +551,11 @@ class PickPlaceController:
             self.controls.joint_targets[4:] = 0.0
         self.last_a_pressed = a_pressed
 
-        b_pressed = state.buttons[glfw.GAMEPAD_BUTTON_B] == glfw.PRESS
-        if b_pressed and not self.last_b_pressed:
-            self.toggle_gripper()
-        self.last_b_pressed = b_pressed
+        # Bumpers work the jaws gradually, matching the O/P keys.
+        jaw_direction = float(
+            state.buttons[glfw.GAMEPAD_BUTTON_LEFT_BUMPER] == glfw.PRESS
+        ) - float(state.buttons[glfw.GAMEPAD_BUTTON_RIGHT_BUMPER] == glfw.PRESS)
+        self.move_gripper(jaw_direction * GRIPPER_SPEED_MPS * dt)
 
     def status(self) -> str:
         """Short state shown periodically in the terminal."""
@@ -548,25 +576,27 @@ def print_controls() -> None:
     print("""
 Kiko-Bot manual pick-and-place controller
 
-  Left hand - move the gripper
-    W / S    : forward / back   (+X / -X)
-    A / D    : left / right     (+Y / -Y)
+  Move the gripper
+    Arrows   : forward / back / left / right
     Q / E    : up / down        (+Z / -Z)
 
-  Right hand - wrist and gripper
-    Up/Down  : rotate J5 + / -
-    Left/Rt  : rotate J6 - / +
-    Space    : open / close the gripper
+  Wrist
+    R / F    : rotate J5 + / -
+    Z / X    : rotate J6 + / -
+    C        : centre J5 and J6
 
-  C          : centre J5 and J6
+  Jaws (hold; stop as soon as they grip)
+    O        : open
+    P        : close
+
   H          : return the robot to the ready pose
 
 Xbox controller (when connected):
   Left stick : XY target movement
   LT / RT    : -Z / +Z target movement
   Right stick: J5 / J6 manual rotation
+  LB / RB    : open / close the jaws
   A          : centre J5 and J6
-  B          : open / close the gripper
 """.strip())
 
 

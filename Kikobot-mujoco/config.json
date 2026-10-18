@@ -14,5 +14,21 @@
             "kp": 1500,
             "forcerange": 50
         }
+    },
+    "geom_properties": {
+        "gripper_l": {
+            "collision": {
+                "friction": "2.0 0.05 0.005",
+                "condim": 4,
+                "solref": "0.004 1"
+            }
+        },
+        "gripper_r": {
+            "collision": {
+                "friction": "2.0 0.05 0.005",
+                "condim": 4,
+                "solref": "0.004 1"
+            }
+        }
     }
 }

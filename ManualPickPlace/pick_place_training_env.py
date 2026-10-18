@@ -210,13 +210,13 @@ class TrainingController(ppc.PickPlaceController):
         super().update_keyboard(dt)
         if self.get_async_key_state is None:
             return
-        down = self._key_is_down(ord("R"))
+        down = self._key_is_down(ord("N"))
         if down and not self.last_respawn_key_down:
             self.respawn_objects()
         self.last_respawn_key_down = down
 
     def on_key(self, keycode: int) -> None:
-        if 32 <= keycode <= 126 and chr(keycode).lower() == "r":
+        if 32 <= keycode <= 126 and chr(keycode).lower() == "n":
             self.respawn_objects()
             return
         super().on_key(keycode)
@@ -267,7 +267,7 @@ def print_controls() -> None:
     ppc.print_controls()
     print("""
 Training scene:
-  R          : respawn the cube and pad in the arm's current direction
+  N          : respawn the cube and pad in the arm's current direction
   V          : start / stop recording the 'record' camera to MP4
 """.rstrip())
 

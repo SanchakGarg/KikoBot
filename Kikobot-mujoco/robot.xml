@@ -103,7 +103,7 @@
                     <inertial pos="0.0102424 -0.01 -0.0103969" mass="0.0471804" fullinertia="5.4758e-06 1.35041e-05 1.63015e-05 0 1.15854e-06 -0"/>
                     <!-- Part gripper_l -->
                     <geom type="mesh" class="visual" pos="-0.0107606 -0.5255 -0.0452006" quat="0.70707 -0.70707 -0.00720201 -0.007202" mesh="gripper_l" material="gripper_l_material"/>
-                    <geom type="mesh" class="collision" pos="-0.0107606 -0.5255 -0.0452006" quat="0.70707 -0.70707 -0.00720201 -0.007202" mesh="gripper_l" material="gripper_l_material"/>
+                    <geom type="mesh" class="collision" pos="-0.0107606 -0.5255 -0.0452006" quat="0.70707 -0.70707 -0.00720201 -0.007202" mesh="gripper_l" material="gripper_l_material" friction="2.0 0.05 0.005" condim="4" solref="0.004 1"/>
                     <!-- Part lm6uu_bearing -->
                     <geom type="mesh" class="visual" pos="0 0 -0.019" quat="1 0 -0 -0" mesh="lm6uu_bearing" material="lm6uu_bearing_material"/>
                     <geom type="mesh" class="collision" pos="0 0 -0.019" quat="1 0 -0 -0" mesh="lm6uu_bearing" material="lm6uu_bearing_material"/>
@@ -124,7 +124,7 @@
                     <geom type="mesh" class="collision" pos="0 0.02 -0.019" quat="1 0 0 0" mesh="lm6uu_bearing" material="lm6uu_bearing_material"/>
                     <!-- Part gripper_r -->
                     <geom type="mesh" class="visual" pos="-0.0107606 0.5255 -0.0479994" quat="0.70707 0.70707 0.007202 -0.00720201" mesh="gripper_r" material="gripper_r_material"/>
-                    <geom type="mesh" class="collision" pos="-0.0107606 0.5255 -0.0479994" quat="0.70707 0.70707 0.007202 -0.00720201" mesh="gripper_r" material="gripper_r_material"/>
+                    <geom type="mesh" class="collision" pos="-0.0107606 0.5255 -0.0479994" quat="0.70707 0.70707 0.007202 -0.00720201" mesh="gripper_r" material="gripper_r_material" friction="2.0 0.05 0.005" condim="4" solref="0.004 1"/>
                   </body>
                 </body>
               </body>
