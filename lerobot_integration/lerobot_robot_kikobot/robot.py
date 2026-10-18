@@ -11,6 +11,7 @@ from functools import cached_property
 from typing import Any
 
 import mujoco
+import mujoco.viewer
 import numpy as np
 
 import kikobot
@@ -113,8 +114,6 @@ class Kikobot(Robot):
             for j in (*ARM_JOINTS, "finger_l")
         }
         if self.config.viewer:
-            import mujoco.viewer
-
             self._viewer = mujoco.viewer.launch_passive(self.model, self.data)
 
     @property
