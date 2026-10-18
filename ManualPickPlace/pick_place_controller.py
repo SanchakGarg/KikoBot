@@ -41,6 +41,10 @@ DEADZONE = 0.12
 DAMPING = 0.035
 MAX_IK_STEP_RAD = np.deg2rad(2.0)
 IK_UPDATE_PERIOD_S = 0.02
+# Steps of IK run on the kinematic copy during a reset, before physics is
+# allowed to run. The CAD ready pose has the gripper below the table surface,
+# so the arm must be placed at the lifted start pose rather than driven there.
+IK_WARM_START_ITERATIONS = 300
 PLANE_AXIS_Z_TOLERANCE = np.sin(np.deg2rad(1.0))
 
 WORLD_Z = np.array([0.0, 0.0, 1.0])
@@ -57,9 +61,9 @@ WORKSPACE_MAX_Z_M = 0.55
 
 # The gripper adds roughly 0.10 m of reach below the J5 task point (the IK
 # target), so the J5-frame ready pose used to sit with the gripper tip
-# nearly touching the floor. Lift the starting Cartesian target well clear
-# of the table before any user input is given.
-READY_POSE_Z_LIFT_M = 0.15
+# nearly touching the floor. Start the Cartesian target at a fixed height
+# well clear of the table before any user input is given.
+READY_POSE_START_Z_M = 0.20
 
 # Windows virtual-key codes.  The dictionary also makes the polling code
 # independent of the GLFW window internals used by MuJoCo's passive viewer.
@@ -67,6 +71,7 @@ KEY_UP = 0x26
 KEY_DOWN = 0x28
 KEY_LEFT = 0x25
 KEY_RIGHT = 0x27
+KEY_SPACE = 0x20
 
 
 @dataclass
@@ -75,6 +80,7 @@ class Controls:
 
     target_position: np.ndarray
     joint_targets: np.ndarray
+    gripper_ctrl: float = 0.0
 
 
 class PickPlaceController:
@@ -111,12 +117,44 @@ class PickPlaceController:
         if self.eef_body_id < 0:
             raise RuntimeError("The model must contain the J5 body.")
 
+        # The two finger meshes straddle the grasp point. Their midpoint is
+        # where an object actually ends up, which is offset from the J5 task
+        # point by an amount that changes with the arm's configuration.
+        # Each mesh appears twice, as a visual and a collision geom; either
+        # gives the same world position, so keep the first of each.
+        finger_geoms = {}
+        for geom_id in range(model.ngeom):
+            mesh_id = model.geom_dataid[geom_id]
+            if mesh_id < 0:
+                continue
+            mesh_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_MESH, mesh_id)
+            if mesh_name in ("gripper_l", "gripper_r"):
+                finger_geoms.setdefault(mesh_name, geom_id)
+        self.finger_geom_ids = [
+            finger_geoms[name] for name in ("gripper_l", "gripper_r")
+            if name in finger_geoms
+        ]
+
         self.joint_low = model.jnt_range[self.joint_ids, 0].copy()
         self.joint_high = model.jnt_range[self.joint_ids, 1].copy()
+        # The gripper is one position servo on finger_l; finger_r mirrors it
+        # through the model's equality constraint. Open/closed come from the
+        # actuator's own ctrlrange so a re-exported CAD stays correct.
+        self.gripper_actuator_id = mujoco.mj_name2id(
+            model, mujoco.mjtObj.mjOBJ_ACTUATOR, "finger_l"
+        )
+        if self.gripper_actuator_id >= 0:
+            closed, opened = model.actuator_ctrlrange[self.gripper_actuator_id]
+            self.gripper_closed_ctrl = float(closed)
+            self.gripper_open_ctrl = float(opened)
+        else:
+            self.gripper_closed_ctrl = self.gripper_open_ctrl = 0.0
+
         self.last_gamepad_present = False
         self.last_a_pressed = False
+        self.last_b_pressed = False
         self.next_ik_time = 0.0
-        self.last_key_down = {"c": False, "h": False}
+        self.last_key_down = {"c": False, "h": False, "space": False}
         self.manual_wrist_moved = False
         self.cartesian_target_moved = False
         self.plane_constraint_blocked = False
@@ -145,19 +183,31 @@ class PickPlaceController:
         targets = READY_POSE_RAD.copy()  # J5 and J6 are centred by default.
         start_position = self.data.xpos[self.eef_body_id].copy()
         start_position[2] = np.clip(
-            start_position[2] + READY_POSE_Z_LIFT_M,
-            WORKSPACE_MIN_Z_M,
-            WORKSPACE_MAX_Z_M,
+            READY_POSE_START_Z_M, WORKSPACE_MIN_Z_M, WORKSPACE_MAX_Z_M
         )
         self.controls = Controls(
             target_position=start_position,
             joint_targets=targets,
+            gripper_ctrl=self.gripper_open_ctrl,  # Start with the jaws open.
         )
+        # Converge the IK on the kinematic copy and place the arm at the
+        # result. Letting physics drive it up from the CAD pose instead would
+        # start the session with the gripper buried in the table, which jams
+        # the fingers against it.
+        for _ in range(IK_WARM_START_ITERATIONS):
+            self.solve_ik_step()
+        self.data.qpos[self.model.jnt_qposadr[self.joint_ids]] = (
+            self.controls.joint_targets
+        )
+        self.data.qvel[:] = 0.0
+        mujoco.mj_forward(self.model, self.data)
+
+        self.plane_constraint_blocked = False
         self.next_ik_time = self.data.time
         self.apply_controls()
 
     def apply_controls(self) -> None:
-        """Send the position-servo targets to actuators named J1 through J6."""
+        """Send the position-servo targets to the arm and gripper actuators."""
         for actuator_id in range(self.model.nu):
             name = mujoco.mj_id2name(
                 self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, actuator_id
@@ -165,6 +215,29 @@ class PickPlaceController:
             if name in {"J1", "J2", "J3", "J4", "J5", "J6"}:
                 joint_index = int(name[1]) - 1
                 self.data.ctrl[actuator_id] = self.controls.joint_targets[joint_index]
+        if self.gripper_actuator_id >= 0:
+            self.data.ctrl[self.gripper_actuator_id] = self.controls.gripper_ctrl
+
+    def grasp_centre(self, data: mujoco.MjData | None = None) -> np.ndarray:
+        """Midpoint between the fingers: where a grasped object ends up."""
+        source = self.data if data is None else data
+        left, right = self.finger_geom_ids
+        return 0.5 * (source.geom_xpos[left] + source.geom_xpos[right])
+
+    def gripper_is_open(self) -> bool:
+        midpoint = 0.5 * (self.gripper_open_ctrl + self.gripper_closed_ctrl)
+        return self.controls.gripper_ctrl > midpoint
+
+    def toggle_gripper(self) -> None:
+        """Flip the jaws between fully open and fully closed."""
+        if self.gripper_actuator_id < 0:
+            return
+        self.controls.gripper_ctrl = (
+            self.gripper_closed_ctrl
+            if self.gripper_is_open()
+            else self.gripper_open_ctrl
+        )
+        print("Gripper " + ("open." if self.gripper_is_open() else "closed."))
 
     def translate_target(self, delta: np.ndarray) -> None:
         """Move the Cartesian target, keeping it in a conservative work volume."""
@@ -332,35 +405,42 @@ class PickPlaceController:
         if self.get_async_key_state is None:
             return
 
-        xy = np.array(
+        # Left hand drives the Cartesian target: WASD on the table plane,
+        # Q/E for height.
+        motion = np.array(
             [
-                float(self._key_is_down(KEY_RIGHT)) - float(self._key_is_down(KEY_LEFT)),
-                float(self._key_is_down(KEY_UP)) - float(self._key_is_down(KEY_DOWN)),
-                0.0,
+                float(self._key_is_down(ord("W"))) - float(self._key_is_down(ord("S"))),
+                float(self._key_is_down(ord("A"))) - float(self._key_is_down(ord("D"))),
+                float(self._key_is_down(ord("Q"))) - float(self._key_is_down(ord("E"))),
             ]
         )
-        z = float(self._key_is_down(ord("Q"))) - float(self._key_is_down(ord("E")))
-        motion = np.array([xy[0], xy[1], z])
         # Diagonal movement has the same maximum speed as axial movement.
         motion_norm = np.linalg.norm(motion)
         if motion_norm > 1.0:
             motion /= motion_norm
         self.translate_target(motion * KEYBOARD_TRANSLATION_SPEED_MPS * dt)
 
-        j5_direction = float(self._key_is_down(ord("R"))) - float(
-            self._key_is_down(ord("F"))
+        # Right hand drives the manual wrist: arrows only.
+        j5_direction = float(self._key_is_down(KEY_UP)) - float(
+            self._key_is_down(KEY_DOWN)
         )
-        j6_direction = float(self._key_is_down(ord("Z"))) - float(
-            self._key_is_down(ord("X"))
+        j6_direction = float(self._key_is_down(KEY_RIGHT)) - float(
+            self._key_is_down(KEY_LEFT)
         )
         self.move_wrist(4, j5_direction * KEYBOARD_WRIST_SPEED_RADPS * dt)
         self.move_wrist(5, j6_direction * KEYBOARD_WRIST_SPEED_RADPS * dt)
 
-        # C and H are one-shot actions rather than repeated actions.
-        for key, virtual_key in (("c", ord("C")), ("h", ord("H"))):
+        # Space, C and H are one-shot actions rather than repeated actions.
+        for key, virtual_key in (
+            ("space", KEY_SPACE),
+            ("c", ord("C")),
+            ("h", ord("H")),
+        ):
             down = self._key_is_down(virtual_key)
             if down and not self.last_key_down[key]:
-                if key == "c":
+                if key == "space":
+                    self.toggle_gripper()
+                elif key == "c":
                     self.controls.joint_targets[4:] = 0.0
                 else:
                     self.reset_to_ready_pose()
@@ -370,29 +450,29 @@ class PickPlaceController:
         """Fallback for non-Windows systems, which use key-repeat events."""
         step = KEYBOARD_TRANSLATION_STEP_M
         wrist_step = KEYBOARD_WRIST_STEP_RAD
-        key_map = {
-            265: np.array([0.0, step, 0.0]),   # GLFW_KEY_UP
-            264: np.array([0.0, -step, 0.0]),  # GLFW_KEY_DOWN
-            263: np.array([-step, 0.0, 0.0]),  # GLFW_KEY_LEFT
-            262: np.array([step, 0.0, 0.0]),   # GLFW_KEY_RIGHT
+        wrist_map = {
+            265: (4, wrist_step),    # GLFW_KEY_UP    -> J5 +
+            264: (4, -wrist_step),   # GLFW_KEY_DOWN  -> J5 -
+            262: (5, wrist_step),    # GLFW_KEY_RIGHT -> J6 +
+            263: (5, -wrist_step),   # GLFW_KEY_LEFT  -> J6 -
         }
-        if keycode in key_map:
-            self.translate_target(key_map[keycode])
+        if keycode in wrist_map:
+            self.move_wrist(*wrist_map[keycode])
             return
 
         key = chr(keycode).lower() if 32 <= keycode <= 126 else ""
-        if key == "q":
-            self.translate_target(np.array([0.0, 0.0, step]))
-        elif key == "e":
-            self.translate_target(np.array([0.0, 0.0, -step]))
-        elif key == "r":
-            self.move_wrist(4, wrist_step)  # Manual J5 positive rotation.
-        elif key == "f":
-            self.move_wrist(4, -wrist_step)  # Manual J5 negative rotation.
-        elif key == "z":
-            self.move_wrist(5, wrist_step)   # Manual J6 positive rotation.
-        elif key == "x":
-            self.move_wrist(5, -wrist_step)  # Manual J6 negative rotation.
+        translation_map = {
+            "w": np.array([step, 0.0, 0.0]),
+            "s": np.array([-step, 0.0, 0.0]),
+            "a": np.array([0.0, step, 0.0]),
+            "d": np.array([0.0, -step, 0.0]),
+            "q": np.array([0.0, 0.0, step]),
+            "e": np.array([0.0, 0.0, -step]),
+        }
+        if key in translation_map:
+            self.translate_target(translation_map[key])
+        elif key == " ":
+            self.toggle_gripper()
         elif key == "c":
             self.controls.joint_targets[4:] = 0.0
         elif key == "h":
@@ -444,6 +524,11 @@ class PickPlaceController:
             self.controls.joint_targets[4:] = 0.0
         self.last_a_pressed = a_pressed
 
+        b_pressed = state.buttons[glfw.GAMEPAD_BUTTON_B] == glfw.PRESS
+        if b_pressed and not self.last_b_pressed:
+            self.toggle_gripper()
+        self.last_b_pressed = b_pressed
+
     def status(self) -> str:
         """Short state shown periodically in the terminal."""
         position_mm = 1000.0 * self.data.xpos[self.eef_body_id]
@@ -462,10 +547,17 @@ class PickPlaceController:
 def print_controls() -> None:
     print("""
 Kiko-Bot manual pick-and-place controller
-  Arrow keys : move Cartesian target in world XY
-  Q / E      : move target +Z / -Z
-  R / F      : manually rotate J5 + / -
-  Z / X      : manually rotate J6 + / -
+
+  Left hand - move the gripper
+    W / S    : forward / back   (+X / -X)
+    A / D    : left / right     (+Y / -Y)
+    Q / E    : up / down        (+Z / -Z)
+
+  Right hand - wrist and gripper
+    Up/Down  : rotate J5 + / -
+    Left/Rt  : rotate J6 - / +
+    Space    : open / close the gripper
+
   C          : centre J5 and J6
   H          : return the robot to the ready pose
 
@@ -474,6 +566,7 @@ Xbox controller (when connected):
   LT / RT    : -Z / +Z target movement
   Right stick: J5 / J6 manual rotation
   A          : centre J5 and J6
+  B          : open / close the gripper
 """.strip())
 
 

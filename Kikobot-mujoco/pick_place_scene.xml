@@ -1,0 +1,67 @@
+<mujoco model="kikobot_pick_place">
+    <!-- Pick-and-place scene: the arm bolted to a table, a graspable cube, a
+         place pad, and a camera framing the whole workspace.
+
+         The arm's own base sits at z=0, so the table's TOP SURFACE is z=0 and
+         the table structure hangs below it. Nothing here changes the robot's
+         kinematics, and this file is never touched by onshape-to-robot. -->
+    <include file="robot.xml" />
+
+    <visual>
+        <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0" />
+        <rgba haze="0.15 0.25 0.35 1" />
+        <global azimuth="160" elevation="-20" offwidth="1280" offheight="720" />
+    </visual>
+
+    <asset>
+        <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512"
+            height="3072" />
+        <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4"
+            rgb2="0.1 0.2 0.3" markrgb="0.8 0.8 0.8" width="300" height="300" />
+        <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5"
+            reflectance="0.2" />
+        <material name="tabletop" rgba="0.72 0.58 0.43 1" reflectance="0.05" />
+        <material name="table_frame" rgba="0.28 0.29 0.32 1" />
+    </asset>
+
+    <worldbody>
+        <light pos="0.4 -0.4 2.2" dir="-0.2 0.2 -1" directional="true" diffuse="0.5 0.5 0.5" />
+        <light pos="-0.5 0.5 1.8" dir="0.3 -0.3 -1" directional="false" diffuse="0.35 0.35 0.35" />
+
+        <!-- Ground, 0.4 m below the table surface the arm is mounted on. -->
+        <geom name="floor" size="0 0 0.05" pos="0 0 -0.4" type="plane" material="groundplane" />
+
+        <!-- Table. Top face is exactly z=0, flush with the arm's base plate.
+             Both are static, so MuJoCo skips the base/table contact entirely. -->
+        <geom name="tabletop" type="box" pos="0 0 -0.01" size="0.5 0.5 0.01"
+            material="tabletop" />
+        <geom name="table_leg_1" type="cylinder" fromto="0.45 0.45 -0.02 0.45 0.45 -0.4"
+            size="0.022" material="table_frame" />
+        <geom name="table_leg_2" type="cylinder" fromto="-0.45 0.45 -0.02 -0.45 0.45 -0.4"
+            size="0.022" material="table_frame" />
+        <geom name="table_leg_3" type="cylinder" fromto="0.45 -0.45 -0.02 0.45 -0.45 -0.4"
+            size="0.022" material="table_frame" />
+        <geom name="table_leg_4" type="cylinder" fromto="-0.45 -0.45 -0.02 -0.45 -0.45 -0.4"
+            size="0.022" material="table_frame" />
+
+        <!-- Object to pick. 40 mm cube: the gripper spans 90 mm open and
+             16 mm closed, so it seats well inside the fingers. -->
+        <body name="target_cube" pos="0.25 0.0 0.02">
+            <freejoint name="target_cube_free" />
+            <geom name="target_cube" type="box" size="0.02 0.02 0.02" rgba="0.85 0.12 0.12 1"
+                mass="0.05" friction="1.5 0.02 0.002" solref="0.004 1" condim="4" />
+        </body>
+
+        <!-- Place target. A mocap body is teleported by writing data.mocap_pos,
+             needs no joint, and still collides, so the cube can rest on it. -->
+        <body name="place_pad" mocap="true" pos="0.26 0.22 0.008">
+            <geom name="place_pad" type="cylinder" size="0.055 0.008"
+                rgba="0.13 0.72 0.25 1" friction="1.5 0.02 0.002" condim="4" />
+        </body>
+
+        <!-- Recording camera. targetbody keeps it aimed at the arm's base, so
+             the framing stays correct if the camera is moved. -->
+        <camera name="record" pos="0.75 -0.75 0.55" mode="targetbody" target="base_plate"
+            fovy="45" resolution="1280 720" />
+    </worldbody>
+</mujoco>
