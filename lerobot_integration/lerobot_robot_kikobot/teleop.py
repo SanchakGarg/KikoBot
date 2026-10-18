@@ -222,11 +222,11 @@ class _GamepadBackend(_Backend):
         )
 
         return {
-            "ee_x.vel": float(lx * KEYBOARD_TRANSLATION_SPEED_MPS * dt),
-            "ee_y.vel": float(-ly * KEYBOARD_TRANSLATION_SPEED_MPS * dt),
-            "ee_z.vel": float((rt - lt) * KEYBOARD_TRANSLATION_SPEED_MPS * dt),
+            "ee_x.vel": float(-ly * KEYBOARD_TRANSLATION_SPEED_MPS * dt),
+            "ee_y.vel": float(lx * KEYBOARD_TRANSLATION_SPEED_MPS * dt),
+            "ee_z.vel": float(-ry * KEYBOARD_TRANSLATION_SPEED_MPS * dt),
             "j5.vel": float(rx * KEYBOARD_WRIST_SPEED_RADPS * dt),
-            "j6.vel": float(-ry * KEYBOARD_WRIST_SPEED_RADPS * dt),
+            "j6.vel": float((rt - lt) * KEYBOARD_WRIST_SPEED_RADPS * dt),
             "gripper.vel": float(jaw * GRIPPER_SPEED_MPS * dt),
         }
 
