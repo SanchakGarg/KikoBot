@@ -37,6 +37,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--repo-id", default="local/kikobot_pickplace")
     p.add_argument("--root", default="datasets/kikobot_pickplace")
     p.add_argument("--no-display", action="store_true", help="skip the rerun viewer")
+    p.add_argument(
+        "--viewer",
+        action="store_true",
+        help="open a native MuJoCo window for teleop preview (smoother than rerun's camera feed)",
+    )
     p.add_argument("--no-sound", action="store_true", help="skip spoken prompts")
     p.add_argument("--seed", type=int, default=None)
     return p.parse_args()
@@ -46,7 +51,7 @@ def main() -> None:
     args = parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-    robot = Kikobot(KikobotConfig(id="kikobot_sim", fps=args.fps, seed=args.seed))
+    robot = Kikobot(KikobotConfig(id="kikobot_sim", fps=args.fps, seed=args.seed, viewer=args.viewer))
     teleop = KikobotTeleop(KikobotTeleopConfig(id="kikobot_teleop", backend=args.backend, fps=args.fps))
 
     teleop_action_processor, robot_action_processor, robot_observation_processor = make_default_processors()

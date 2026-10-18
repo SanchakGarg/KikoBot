@@ -36,6 +36,10 @@ class KikobotConfig(RobotConfig):
     # Not `cameras`: RobotConfig reserves that name for CameraConfig objects.
     camera_names: tuple[str, ...] = ("record",)
     seed: int | None = None
+    # A native passive viewer window, decoupled from the recorded camera and
+    # Rerun's slower image-logging path. Windows: plain `python`. macOS needs
+    # `mjpython` -- `launch_passive` must own the real main thread there.
+    viewer: bool = False
 
 
 class Kikobot(Robot):
@@ -49,6 +53,7 @@ class Kikobot(Robot):
         self.data: mujoco.MjData | None = None
         self.controller: TrainingController | None = None
         self._renderer: mujoco.Renderer | None = None
+        self._viewer = None
 
     # ---------------------------------------------------------------- features
 
@@ -107,6 +112,10 @@ class Kikobot(Robot):
             j: int(self.model.jnt_qposadr[mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, j)])
             for j in (*ARM_JOINTS, "finger_l")
         }
+        if self.config.viewer:
+            import mujoco.viewer
+
+            self._viewer = mujoco.viewer.launch_passive(self.model, self.data)
 
     @property
     def is_calibrated(self) -> bool:
@@ -122,6 +131,9 @@ class Kikobot(Robot):
         if self._renderer is not None:
             self._renderer.close()
         self._renderer = None
+        if self._viewer is not None:
+            self._viewer.close()
+        self._viewer = None
         self.controller = None
         self.model = self.data = None
 
@@ -167,6 +179,8 @@ class Kikobot(Robot):
             mujoco.mj_step(self.model, self.data)
         if wrist_only:
             c.hold_cartesian_target_at_current_pose()
+        if self._viewer is not None:
+            self._viewer.sync()
         return action
 
     # ---------------------------------------------------------------- episode
