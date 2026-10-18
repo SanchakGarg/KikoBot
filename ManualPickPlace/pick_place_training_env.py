@@ -56,7 +56,7 @@ FINGER_REACH_BELOW_GRASP_CENTRE_M = 0.048
 TABLE_CLEARANCE_M = 0.008
 
 # Must match the geometry declared in pick_place_scene.xml.
-CUBE_HALF_EXTENT_M = 0.02
+CUBE_HALF_EXTENT_M = 0.016
 PAD_HALF_HEIGHT_M = 0.008
 PAD_RADIUS_M = 0.055
 # Keep the pad clear of the cube so a grasp is never fouled by the pad rim.

@@ -1,0 +1,37 @@
+<!-- Spliced into robot.xml by onshape-to-robot via "additional_xml" in
+     config.json, so everything here survives a CAD regeneration instead of
+     being wiped like hand edits to robot.xml.
+
+     Keep this in sync with robot.xml by hand between rebuilds: robot.xml
+     already contains a copy of this block, and the next rebuild overwrites
+     it from here. -->
+
+<!-- Contact solver settings. Both matter for grasping:
+
+     cone="elliptic"  - the friction cone is solved as a real cone instead of
+                        a pyramid, so grip force does not depend on which way
+                        the object happens to slide.
+     impratio="100"   - frictional constraints are made 100x stiffer than
+                        normal ones. At the default of 1 a contact that is
+                        well inside its friction cone still creeps under load,
+                        which is what made a firmly gripped cube slide out of
+                        the jaws a millimetre at a time. -->
+<option cone="elliptic" impratio="100"/>
+
+<!-- The gripper is one actuator on finger_l with finger_r tied to it by the
+     equality constraint onshape-to-robot emits from the CAD mimic. At the
+     default softness that constraint stretches by ~10 mm under grip load, so
+     the jaws closed asymmetrically, squeezed the cube off-centre and
+     chattered. Raising its impedance makes the two fingers actually track
+     each other. The equality element carries no class, so it picks up the
+     main default class defined here. -->
+<default>
+  <equality solref="0.004 1" solimp="0.995 0.9999 0.0001 0.5 2"/>
+</default>
+
+<!-- qpos0 equals each joint's ref: the pose the CAD was exported in,
+     which sits at the lower hard stop (J5 is 7 deg inside it).
+     "home" is the mid-travel pose: every joint at 0 deg, gripper open. -->
+<keyframe>
+  <key name="home" qpos="0 0 0 0 0 0 0 0" ctrl="0 0 0 0 0 0 0"/>
+</keyframe>
