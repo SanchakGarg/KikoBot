@@ -32,6 +32,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--task", default=DEFAULT_TASK)
     p.add_argument("--device", default=None, help="defaults to the policy's own device")
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--viewer", action="store_true", help="open a native MuJoCo window to watch the policy")
     return p.parse_args()
 
 
@@ -39,7 +40,7 @@ def main() -> None:
     args = parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-    robot = Kikobot(KikobotConfig(id="kikobot_eval", fps=args.fps, seed=args.seed))
+    robot = Kikobot(KikobotConfig(id="kikobot_eval", fps=args.fps, seed=args.seed, viewer=args.viewer))
     policy = ACTPolicy.from_pretrained(args.policy)
     # policy.config.device is a string; predict_action wants a torch.device.
     device = torch.device(args.device or str(policy.config.device))
