@@ -221,12 +221,12 @@ class _GamepadBackend(_Backend):
         )
 
         return {
-            "ee_x.vel": float(-ly * KEYBOARD_TRANSLATION_SPEED_MPS * dt),
+            "ee_x.vel": float(ly * KEYBOARD_TRANSLATION_SPEED_MPS * dt),
             "ee_y.vel": float(lx * KEYBOARD_TRANSLATION_SPEED_MPS * dt),
             "ee_z.vel": float(-ry * KEYBOARD_TRANSLATION_SPEED_MPS * dt),
             "j5.vel": 0.0,  # Right stick left/right is unmapped; no J5 control.
             "j6.vel": float(wrist * KEYBOARD_WRIST_SPEED_RADPS * dt),
-            "gripper.vel": float((rt - lt) * GRIPPER_SPEED_MPS * dt),
+            "gripper.vel": float((lt - rt) * GRIPPER_SPEED_MPS * dt),
         }
 
 

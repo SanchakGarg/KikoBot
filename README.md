@@ -150,6 +150,23 @@ $V/python lerobot_integration/scripts/evaluate.py \
   --policy outputs/train/kikobot_act/checkpoints/last/pretrained_model --episodes 20
 ```
 
+Choose the dataset name with `--repo-id` and its local directory with `--root`.
+For example, to record a separate dataset rather than use the default
+`local/kikobot_pickplace` / `datasets/kikobot_pickplace`:
+
+```powershell
+& "$V\python.exe" ".\lerobot_integration\scripts\record.py" `
+  --episodes 50 --episode-time 40 `
+  --repo-id local/my_kikobot_data --root datasets/my_kikobot_data
+```
+
+The recording script creates a new dataset at `--root`; use a new directory
+for each recording rather than pointing it at an existing dataset.
+
+With `--backend gamepad`, the left stick controls XY (up/down is inverted from
+the previous mapping), the right stick's vertical axis controls Z, and LT/RT
+control the gripper (their directions are inverted from the previous mapping).
+
 While recording: `→`/`n` saves the episode, `←`/`r` re-records it, `esc`/`q`
 stops. `--display_data=true` opens rerun, which is how you watch the arm
 without `mjpython`. Inspect a finished dataset with
