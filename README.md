@@ -142,7 +142,8 @@ $V/python lerobot_integration/scripts/record.py --episodes 50 --episode-time 40
 # 3. Train ACT. cuda on the Windows box; mps on the Mac works but is slower.
 $V/lerobot-train --dataset.repo_id=local/kikobot_pickplace \
   --dataset.root=datasets/kikobot_pickplace \
-  --policy.type=act --policy.device=cuda --steps=60000 --batch_size=16 \
+  --policy.type=act --policy.device=cuda --policy.push_to_hub=false \
+  --steps=60000 --batch_size=16 \
   --output_dir=outputs/train/kikobot_act --wandb.enable=false
 
 # 4. Score the trained policy in sim.
