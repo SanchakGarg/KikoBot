@@ -26,8 +26,11 @@ from lerobot.utils.decorators import check_if_not_connected
 
 logger = logging.getLogger(__name__)
 
-AXES = ("ee_x.vel", "ee_y.vel", "ee_z.vel", "j5.vel", "j6.vel", "gripper.vel")
-ZERO: RobotAction = dict.fromkeys(AXES, 0.0)
+# Backends report per-step motion deltas under these names. The teleop turns
+# them into the absolute targets that are recorded as the action.
+DELTAS = ("dx", "dy", "dz", "dj5", "dj6", "dgrip")
+ACTION_KEYS = ("ee_x.pos", "ee_y.pos", "ee_z.pos", "j5.pos", "j6.pos", "gripper.pos")
+ZERO: RobotAction = dict.fromkeys(DELTAS, 0.0)
 
 
 @TeleoperatorConfig.register_subclass("kikobot_teleop")
@@ -46,10 +49,15 @@ class KikobotTeleop(Teleoperator):
         self.config = config
         self._backend: _Backend | None = None
         self._last_t: float | None = None
+        self._robot = None
+
+    def attach(self, robot) -> None:
+        """Link the robot whose commanded pose the deltas are added to."""
+        self._robot = robot
 
     @property
     def action_features(self) -> dict[str, type]:
-        return dict.fromkeys(AXES, float)
+        return dict.fromkeys(ACTION_KEYS, float)
 
     @property
     def feedback_features(self) -> dict:
@@ -89,7 +97,13 @@ class KikobotTeleop(Teleoperator):
         now = time.perf_counter()
         dt = 1.0 / self.config.fps if self._last_t is None else min(now - self._last_t, 0.1)
         self._last_t = now
-        return self._backend.poll(dt)
+        if self._robot is None:
+            raise RuntimeError("Call KikobotTeleop.attach(robot) before get_action().")
+        delta = self._backend.poll(dt)
+        base = self._robot.commanded_action()
+        return self._robot.clamp_action(
+            {key: base[key] + delta[d] for key, d in zip(ACTION_KEYS, DELTAS)}
+        )
 
     def send_feedback(self, feedback: dict[str, Any]) -> None:
         pass
@@ -169,12 +183,12 @@ class _KeyboardBackend(_Backend):
         motion *= KEYBOARD_TRANSLATION_SPEED_MPS * dt
 
         return {
-            "ee_x.vel": float(motion[0]),
-            "ee_y.vel": float(motion[1]),
-            "ee_z.vel": float(motion[2]),
-            "j5.vel": float((self._down("r") - self._down("f")) * KEYBOARD_WRIST_SPEED_RADPS * dt),
-            "j6.vel": float((self._down("z") - self._down("x")) * KEYBOARD_WRIST_SPEED_RADPS * dt),
-            "gripper.vel": float((self._down("o") - self._down("p")) * GRIPPER_SPEED_MPS * dt),
+            "dx": float(motion[0]),
+            "dy": float(motion[1]),
+            "dz": float(motion[2]),
+            "dj5": float((self._down("r") - self._down("f")) * KEYBOARD_WRIST_SPEED_RADPS * dt),
+            "dj6": float((self._down("z") - self._down("x")) * KEYBOARD_WRIST_SPEED_RADPS * dt),
+            "dgrip": float((self._down("o") - self._down("p")) * GRIPPER_SPEED_MPS * dt),
         }
 
 
@@ -221,12 +235,12 @@ class _GamepadBackend(_Backend):
         )
 
         return {
-            "ee_x.vel": float(ly * KEYBOARD_TRANSLATION_SPEED_MPS * dt),
-            "ee_y.vel": float(lx * KEYBOARD_TRANSLATION_SPEED_MPS * dt),
-            "ee_z.vel": float(-ry * KEYBOARD_TRANSLATION_SPEED_MPS * dt),
-            "j5.vel": 0.0,  # Right stick left/right is unmapped; no J5 control.
-            "j6.vel": float(wrist * KEYBOARD_WRIST_SPEED_RADPS * dt),
-            "gripper.vel": float((lt - rt) * GRIPPER_SPEED_MPS * dt),
+            "dx": float(ly * KEYBOARD_TRANSLATION_SPEED_MPS * dt),
+            "dy": float(lx * KEYBOARD_TRANSLATION_SPEED_MPS * dt),
+            "dz": float(-ry * KEYBOARD_TRANSLATION_SPEED_MPS * dt),
+            "dj5": 0.0,  # Right stick left/right is unmapped; no J5 control.
+            "dj6": float(wrist * KEYBOARD_WRIST_SPEED_RADPS * dt),
+            "dgrip": float((lt - rt) * GRIPPER_SPEED_MPS * dt),
         }
 
 
@@ -246,10 +260,10 @@ class _ScriptedBackend(_Backend):
         close = 3.0 <= phase < 4.0   # shut the jaws
         lift = 4.0 <= phase < 6.0    # pick it up
         return {
-            "ee_x.vel": 0.04 * dt if reach else (-0.03 * dt if lift else 0.0),
-            "ee_y.vel": 0.0,
-            "ee_z.vel": -0.05 * dt if reach else (0.06 * dt if lift else 0.0),
-            "j5.vel": 0.0,
-            "j6.vel": 0.3 * dt if reach else 0.0,
-            "gripper.vel": -GRIPPER_SPEED_MPS * dt if close else 0.0,
+            "dx": 0.04 * dt if reach else (-0.03 * dt if lift else 0.0),
+            "dy": 0.0,
+            "dz": -0.05 * dt if reach else (0.06 * dt if lift else 0.0),
+            "dj5": 0.0,
+            "dj6": 0.3 * dt if reach else 0.0,
+            "dgrip": -GRIPPER_SPEED_MPS * dt if close else 0.0,
         }

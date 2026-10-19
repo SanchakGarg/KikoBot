@@ -82,6 +82,7 @@ def main() -> None:
 
     teleop.connect()  # Before the robot, as lerobot-record does.
     robot.connect()
+    teleop.attach(robot)
     listener, events = init_keyboard_listener()
     if not args.no_display:
         init_rerun(session_name="kikobot_record")

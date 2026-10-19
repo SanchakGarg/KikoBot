@@ -15,6 +15,11 @@ import mujoco.viewer
 import numpy as np
 
 import kikobot
+from kikobot.sim.controller import (
+    WORKSPACE_MAX_Z_M,
+    WORKSPACE_MIN_Z_M,
+    WORKSPACE_XY_RADIUS_M,
+)
 from kikobot.sim.training_env import TrainingController
 from lerobot.lerobot_types import RobotAction, RobotObservation
 from lerobot.robots import Robot, RobotConfig
@@ -85,15 +90,16 @@ class Kikobot(Robot):
 
     @cached_property
     def action_features(self) -> dict[str, type]:
-        # `.vel` is required: lerobot-rollout drops features without a
-        # `.pos`/`.vel` suffix, which would empty the action space.
+        # Absolute commanded targets. The `.pos` suffix is required:
+        # lerobot-rollout drops features without a `.pos`/`.vel` suffix, which
+        # would empty the action space.
         return {
-            "ee_x.vel": float,
-            "ee_y.vel": float,
-            "ee_z.vel": float,
-            "j5.vel": float,
-            "j6.vel": float,
-            "gripper.vel": float,
+            "ee_x.pos": float,
+            "ee_y.pos": float,
+            "ee_z.pos": float,
+            "j5.pos": float,
+            "j6.pos": float,
+            "gripper.pos": float,
         }
 
     # ------------------------------------------------------------- connection
@@ -155,22 +161,50 @@ class Kikobot(Robot):
             obs[cam] = self._renderer.render()
         return obs
 
+    def commanded_action(self) -> RobotAction:
+        """The pose the controller is currently commanding, in action form."""
+        c = self.controller
+        x, y, z = c.controls.target_position
+        return {
+            "ee_x.pos": float(x),
+            "ee_y.pos": float(y),
+            "ee_z.pos": float(z),
+            "j5.pos": float(c.controls.joint_targets[4]),
+            "j6.pos": float(c.controls.joint_targets[5]),
+            "gripper.pos": float(c.controls.gripper_ctrl),
+        }
+
+    def clamp_action(self, action: RobotAction) -> RobotAction:
+        """Limit an absolute target to the work volume, wrist range and jaw range."""
+        c = self.controller
+        xyz = np.array([action["ee_x.pos"], action["ee_y.pos"], action["ee_z.pos"]], dtype=float)
+        xyz[2] = np.clip(xyz[2], WORKSPACE_MIN_Z_M, WORKSPACE_MAX_Z_M)
+        norm = np.linalg.norm(xyz[:2])
+        if norm > WORKSPACE_XY_RADIUS_M:
+            xyz[:2] *= WORKSPACE_XY_RADIUS_M / norm
+        jaw_low = min(c.gripper_open_ctrl, c.gripper_closed_ctrl)
+        jaw_high = max(c.gripper_open_ctrl, c.gripper_closed_ctrl)
+        return {
+            "ee_x.pos": float(xyz[0]),
+            "ee_y.pos": float(xyz[1]),
+            "ee_z.pos": float(xyz[2]),
+            "j5.pos": float(np.clip(action["j5.pos"], c.joint_low[4], c.joint_high[4])),
+            "j6.pos": float(np.clip(action["j6.pos"], c.joint_low[5], c.joint_high[5])),
+            "gripper.pos": float(np.clip(action["gripper.pos"], jaw_low, jaw_high)),
+        }
+
     @check_if_not_connected
     def send_action(self, action: RobotAction) -> RobotAction:
         c = self.controller
+        target = self.clamp_action(action)
+        current = self.commanded_action()
         c.begin_input_frame()
         c.translate_target(
-            np.array(
-                [
-                    float(action.get("ee_x.vel", 0.0)),
-                    float(action.get("ee_y.vel", 0.0)),
-                    float(action.get("ee_z.vel", 0.0)),
-                ]
-            )
+            np.array([target[k] - current[k] for k in ("ee_x.pos", "ee_y.pos", "ee_z.pos")])
         )
-        c.move_wrist(4, float(action.get("j5.vel", 0.0)))
-        c.move_wrist(5, float(action.get("j6.vel", 0.0)))
-        c.move_gripper(float(action.get("gripper.vel", 0.0)))
+        c.move_wrist(4, target["j5.pos"] - current["j5.pos"])
+        c.move_wrist(5, target["j6.pos"] - current["j6.pos"])
+        c.controls.gripper_ctrl = target["gripper.pos"]
 
         # A pure wrist move must not make J1--J4 chase the Cartesian target.
         wrist_only = c.manual_wrist_moved and not c.cartesian_target_moved

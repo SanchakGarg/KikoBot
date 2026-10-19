@@ -347,10 +347,10 @@ To see every policy your installed LeRobot version supports, run `$V/lerobot-tra
 | | Contents |
 |---|---|
 | **Observations** | 6 joint angles (`.pos`), jaw opening (`gripper.pos`), end-effector position (`ee_x/y/z.pos`) = 10 floats, plus the `record` camera image (640 × 480 by default) |
-| **Actions** | End-effector movement per step (`ee_x/y/z.vel`), the two wrist joints (`j5.vel`, `j6.vel`) and the jaws (`gripper.vel`) = 6 floats |
+| **Actions** | Absolute commanded targets: end-effector position (`ee_x/y/z.pos`), the two wrist joints (`j5.pos`, `j6.pos`) and the jaws (`gripper.pos`) = 6 floats. The sim's IK turns the end-effector target into joint motion. |
 
-The `.pos`/`.vel` suffixes are required. `lerobot-rollout` ignores any feature
-without one, which would leave the policy with no actions.
+The `.pos` suffix is required. `lerobot-rollout` ignores any feature
+without a `.pos`/`.vel` suffix, which would leave the policy with no actions.
 
 ---
 
