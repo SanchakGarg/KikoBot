@@ -14,7 +14,7 @@ MUJOCO_LOG.TXT
 *.mp4
 
 # LeRobot data and training output (large, regenerable)
-# datasets/
+datasets/
 outputs/
 
 # Removed ROS package (kept so stale local copies stay ignored)
