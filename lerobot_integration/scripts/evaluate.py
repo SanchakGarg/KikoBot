@@ -12,8 +12,8 @@ import logging
 
 import torch
 from lerobot.common.control_utils import predict_action
-from lerobot.policies import make_pre_post_processors
-from lerobot.policies.act import ACTPolicy
+from lerobot.configs.policies import PreTrainedConfig
+from lerobot.policies import get_policy_class, make_pre_post_processors
 from lerobot.policies.utils import make_robot_action
 from lerobot.utils.constants import ACTION, OBS_STR
 from lerobot.utils.feature_utils import build_dataset_frame, combine_feature_dicts, hw_to_dataset_features
@@ -41,7 +41,10 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     robot = Kikobot(KikobotConfig(id="kikobot_eval", fps=args.fps, seed=args.seed, viewer=args.viewer))
-    policy = ACTPolicy.from_pretrained(args.policy)
+    # config.json's "type" picks the policy class, so ACT and SmolVLA both load.
+    policy_cfg = PreTrainedConfig.from_pretrained(args.policy)
+    policy = get_policy_class(policy_cfg.type).from_pretrained(args.policy, config=policy_cfg)
+    policy.eval()
     # policy.config.device is a string; predict_action wants a torch.device.
     device = torch.device(args.device or str(policy.config.device))
 
@@ -50,7 +53,7 @@ def main() -> None:
         hw_to_dataset_features(robot.observation_features, OBS_STR, True),
     )
     preprocessor, postprocessor = make_pre_post_processors(
-        policy_cfg=policy,
+        policy_cfg=policy_cfg,
         pretrained_path=args.policy,
         preprocessor_overrides={"device_processor": {"device": str(device)}},
     )
